@@ -2440,8 +2440,16 @@ class Order extends MY_Controller
               
         }
         
-     
-             
+        // Sort items within each subcategory by menu_option_name so same-named items
+        // (e.g. "Black Bean Enchiladas" with different variations) appear consecutively
+        foreach ($output as $categoryId => &$categoryData) {
+            foreach ($categoryData['subcategories'] as $subcatName => &$subcatData) {
+                uasort($subcatData['items'], function($a, $b) {
+                    return strcmp($a['menu_option_name'], $b['menu_option_name']);
+                });
+            }
+        }
+        unset($categoryData, $subcatData);
 
         // Fetch metrics for the selected date (filter by department if provided)
         $metrics = $this->getProductionFormMetrics($selectedDate, $departmentId);

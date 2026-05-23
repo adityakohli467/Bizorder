@@ -151,9 +151,12 @@ function fetchOrderForChef($date = null, $orderId = null, $departmentId = null) 
     // Only show items with quantity > 0
     $this->tenantDb->having('all_qty >', 0);
     
-    // Order by category, then by menu item (which is the subcategory), then by option
+    // Order by category, then by menu item (which is the subcategory), then by option name
+    // Sorting by menu_option_name ensures items with the same name (e.g. "Black Bean Enchiladas")
+    // but different variations are grouped together consecutively
     $this->tenantDb->order_by('category_sort_order', 'ASC');
     $this->tenantDb->order_by('menu_item_sort_order', 'ASC');
+    $this->tenantDb->order_by('mo.menu_option_name', 'ASC');
 
     $query = $this->tenantDb->get();
     // Debug: Production form query
