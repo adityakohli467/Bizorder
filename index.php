@@ -3,6 +3,7 @@
 // FIX: ERR_HTTP2_PROTOCOL_ERROR
 // ========================================
 // Clean any existing output buffers
+
 while (ob_get_level() > 0) {
     ob_end_clean();
 }
