@@ -301,8 +301,10 @@ function getAllergenNames($allergenValues, $allergies) {
                                                                 <?php foreach ($groupedOptions as $optName => $group) {
                                                                     $firstOptionId = $group['option_ids'][0];
                                                                     // Check if ANY option_id in this group was saved
-                                                                    // Common items default to checked when creating a new menu planner
-                                                                    $isCommonDefault = (isset($menu['is_common_item']) && $menu['is_common_item'] == 1) ? 'checked' : $defaultAllChecked;
+                                                                    // Common items default to checked ONLY when creating a new menu planner
+                                                                    // When editing an existing planner, only respect saved state
+                                                                    $isEditingExisting = isset($menuPlannerRecordId) && !empty($menuPlannerRecordId);
+                                                                    $isCommonDefault = (!$isEditingExisting && isset($menu['is_common_item']) && $menu['is_common_item'] == 1) ? 'checked' : '';
                                                                     $groupChecked = $isCommonDefault;
                                                                     if (isset($savedMenuWithOptions[$categoryId][$menuId]) && !empty($savedMenuWithOptions[$categoryId][$menuId])) {
                                                                         $hasAnySaved = false;
@@ -312,7 +314,7 @@ function getAllergenNames($allergenValues, $allergies) {
                                                                                 break;
                                                                             }
                                                                         }
-                                                                        $groupChecked = $hasAnySaved ? 'checked' : $isCommonDefault;
+                                                                        $groupChecked = $hasAnySaved ? 'checked' : '';
                                                                     }
                                                                 ?>
                                                                     <div class="bg-gray-50 hover:bg-gray-100 transition-colors rounded-md p-2 flex items-center">
@@ -350,11 +352,13 @@ function getAllergenNames($allergenValues, $allergies) {
                                                             </div>
                                                         <?php } else { ?>
                                                             <?php
-                                                            // Common items default to checked when creating a new menu planner
-                                                            $isCommonDefault = (isset($menu['is_common_item']) && $menu['is_common_item'] == 1) ? 'checked' : $defaultAllChecked;
+                                                            // Common items default to checked ONLY when creating a new menu planner
+                                                            // When editing an existing planner, only respect saved state
+                                                            $isEditingExisting = isset($menuPlannerRecordId) && !empty($menuPlannerRecordId);
+                                                            $isCommonDefault = (!$isEditingExisting && isset($menu['is_common_item']) && $menu['is_common_item'] == 1) ? 'checked' : '';
                                                             $isChecked = $isCommonDefault;
-                                                            if(isset($savedMenuWithoutOptions[$categoryId]) && !empty(isset($savedMenuWithoutOptions[$categoryId]))){
-                                                                $isChecked = in_array($menuId, $savedMenuWithoutOptions[$categoryId]) ? 'checked' : $isCommonDefault;
+                                                            if(isset($savedMenuWithoutOptions[$categoryId]) && !empty($savedMenuWithoutOptions[$categoryId])){
+                                                                $isChecked = in_array($menuId, $savedMenuWithoutOptions[$categoryId]) ? 'checked' : '';
                                                             }
                                                             ?>
                                                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2"> <!-- Reduced gap-3 to gap-2 -->
@@ -648,6 +652,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let originalText = $(obj).html();
     $(obj).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...').prop('disabled', true);
+
+    // Sync all hidden inputs' disabled state with their checkbox BEFORE serializing
+    // This ensures unchecked items are properly excluded even if change event was missed
+    document.querySelectorAll('.menu-option-group-toggle').forEach(function(cb) {
+        var container = cb.closest('.flex.items-center');
+        if (!container) return;
+        var hiddenInputs = container.querySelectorAll('.grouped-option-input');
+        hiddenInputs.forEach(function(input) {
+            input.disabled = !cb.checked;
+        });
+    });
 
     let dept = $("#floor-selector").val();
     let menuPlannerDate = $("#menuPlannerDate").val();

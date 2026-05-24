@@ -521,9 +521,10 @@ class Menuplanner extends MY_Controller {
                         // Admin editing published menu — keep status as published
                         $finalStatus = 2;
                         log_message('info', "MENU PLANNER ADMIN EDIT: Admin updating PUBLISHED record ID={$checkRecordId}. Status will remain PUBLISHED. User=" . ($this->session->userdata('username') ?: 'UNKNOWN') . " at " . australia_datetime());
+                    } else {
+                        // If not published, use the saveType as-is
+                        $finalStatus = $saveType;
                     }
-                    // If not published, use the saveType as-is
-                    $finalStatus = $saveType;
                 } else {
                     // No record ID yet - do fresh check by date
                     $freshStatusCheck = ['date' => $date, 'department_id' => $deptId, 'status !=' => 0];
@@ -536,8 +537,9 @@ class Menuplanner extends MY_Controller {
                     }
                     if (!empty($statusCheckData) && isset($statusCheckData[0]['status']) && $statusCheckData[0]['status'] == 2 && $isAdmin) {
                         $finalStatus = 2; // Admin editing — keep status as published
+                    } else {
+                        $finalStatus = $saveType;
                     }
-                    $finalStatus = $saveType;
                 }
             }
             
