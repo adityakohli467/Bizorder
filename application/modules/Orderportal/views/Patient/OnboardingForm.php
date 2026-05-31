@@ -351,12 +351,8 @@ input[type=checkbox], input[type=radio] {
                                 </div>
                             </div>
 
-                            <!-- Special Instructions -->
-                            <div id="special-instructions-field" class="form-group md:col-span-2">
-                                <label for="instructions" class="block text-sm text-gray-600 mb-1">Special Instructions</label>
-                                <textarea id="instructions" name="instructions" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-gray-50" 
-                                          placeholder="Enter any special instructions or notes"><?php echo ($patientDetails['special_instructions'] != '' ? $patientDetails['special_instructions'] : '') ?></textarea>
-                            </div>
+                            <!-- Special Instructions - Hidden -->
+                            <input type="hidden" id="instructions" name="instructions" value="<?php echo ($patientDetails['special_instructions'] != '' ? htmlspecialchars($patientDetails['special_instructions']) : '') ?>" />
 
                             <!-- Patient Photo Upload -->
                             <div id="patient-photo-field" class="form-group md:col-span-2">

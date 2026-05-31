@@ -1580,6 +1580,11 @@ public function transferClient() {
         $notification_msg = "🔄 Room Transfer: Patient '{$active_client['name']}' moved from {$source_suite['bed_no']} to {$destination_suite['bed_no']} at " . australia_datetime() . ". {$ordersTransferred} meal order(s) updated.";
         createNotification($this->tenantDb, 1, $this->selected_location_id, 'notice', $notification_msg);
         
+        // ═══════════════════════════════════════════════════════════════════
+        // EMAIL NOTIFICATION: Patient transferred between suites
+        // ═══════════════════════════════════════════════════════════════════
+        $this->sendTransferEmailFromConfig($active_client['name'] ?? 'Unknown', $source_suite_id, $source_suite, $destination_suite_id, $destination_suite, $ordersTransferred);
+        
         echo json_encode([
             'status' => 'success',
             'message' => "Client successfully transferred from Suite {$source_suite['bed_no']} to Suite {$destination_suite['bed_no']}" . ($ordersTransferred > 0 ? ". {$ordersTransferred} order(s) transferred." : ""),
@@ -1893,6 +1898,63 @@ public function debugTransferData($suite_id = null) {
             'status' => 'error',
             'message' => 'Debug error: ' . $e->getMessage()
         ]);
+    }
+}
+
+/**
+ * Send email notification when a patient is transferred between suites (from Hospitalconfig)
+ */
+private function sendTransferEmailFromConfig($patientName, $sourceSuiteId, $sourceSuite, $destSuiteId, $destSuite, $ordersTransferred) {
+    try {
+        $this->load->helper('custom');
+        
+        $from_suite = $sourceSuite['bed_no'] ?? "Suite {$sourceSuiteId}";
+        $to_suite = $destSuite['bed_no'] ?? "Suite {$destSuiteId}";
+        
+        // Get floor names
+        $old_floor_id = $sourceSuite['floor'] ?? null;
+        $new_floor_id = $destSuite['floor'] ?? null;
+        
+        $from_floor = "Floor {$old_floor_id}";
+        if (!empty($old_floor_id)) {
+            $old_floor_details = $this->tenantDb->where('id', $old_floor_id)
+                                               ->where('listtype', 'floor')
+                                               ->get('foodmenuconfig')
+                                               ->row_array();
+            if (!empty($old_floor_details)) {
+                $from_floor = $old_floor_details['name'];
+            }
+        }
+        
+        $to_floor = "Floor {$new_floor_id}";
+        if (!empty($new_floor_id)) {
+            $new_floor_details = $this->tenantDb->where('id', $new_floor_id)
+                                               ->where('listtype', 'floor')
+                                               ->get('foodmenuconfig')
+                                               ->row_array();
+            if (!empty($new_floor_details)) {
+                $to_floor = $new_floor_details['name'];
+            }
+        }
+        
+        $data = [
+            'patient_name' => $patientName,
+            'from_suite' => $from_suite,
+            'from_floor' => $from_floor,
+            'to_suite' => $to_suite,
+            'to_floor' => $to_floor,
+            'orders_transferred' => $ordersTransferred,
+            'transfer_time' => australia_datetime()
+        ];
+        
+        $email_body = $this->load->view('Email/patient_transferred', $data, TRUE);
+        $email_subject = "Patient Suite Transfer | {$patientName} | {$from_suite} → {$to_suite}";
+        
+        $this->sendEmail('emine@zenncafe.com.au', $email_subject, $email_body, 'info@bizadmin.com.au', 'kaushika@aaria.com.au');
+        
+        log_message('info', "TRANSFER EMAIL SENT (Config): Email notification sent for patient {$patientName} transfer from {$from_suite} to {$to_suite}");
+    } catch (Exception $e) {
+        log_message('error', "TRANSFER EMAIL FAILED (Config): " . $e->getMessage());
     }
 }
     

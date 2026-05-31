@@ -963,15 +963,16 @@
                         const vCuisineIds = (typeof v.cuisine_type_ids === 'string' ? JSON.parse(v.cuisine_type_ids) : v.cuisine_type_ids) || [];
                         const vCuisineStrs = vCuisineIds.map(String).sort();
                         
-                        // SUBSET MATCH for cuisine:
-                        // Item's cuisines must all be within patient's preferences
+                        // EXACT MATCH for cuisine:
+                        // Variation must contain ALL of patient's dietary preferences
+                        // e.g. patient ["29","30","31"] (GF+DF+LC) only matches variation with all three combined
                         if (patientIds.length === 0) {
                             // No dietary preferences: only match standard variations (empty cuisine)
                             if (vCuisineStrs.length !== 0) return false;
                         } else {
-                            // Has dietary preferences: item cuisines must be a non-empty subset of patient preferences
-                            if (vCuisineStrs.length === 0) return false;
-                            if (!vCuisineStrs.every(id => patientIds.includes(id))) return false;
+                            // Has dietary preferences: variation must contain ALL patient preferences
+                            if (vCuisineStrs.length === 0) return false; // Empty cuisine = standard, not for dietary patients
+                            if (!patientIds.every(id => vCuisineStrs.includes(id))) return false;
                         }
                     }
                     

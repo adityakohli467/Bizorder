@@ -362,6 +362,9 @@ class Patient extends MY_Controller
         $msg = "Suite Added: Suite {$suiteNo} - onboarded new patient {$patientName}";
         $this->load->helper('notification');
         createNotification($this->tenantDb, 1, $this->selected_location_id, 'alert', $msg);
+        
+        // EMAIL NOTIFICATION: New patient onboarded
+        $this->sendOnboardingEmail($save_data['name'], $suite_number, $save_data['floor_number'], $allergies_value, $dietary_preferences_value, $onboard_date);
     } else {
         $save_data['date_modified'] = australia_datetime();
         $this->common_model->commonRecordUpdate('people','id',$person_id,$save_data);
@@ -376,6 +379,9 @@ class Patient extends MY_Controller
             $msg = "Patient Updated: {$patientName} - dietary or allergens updated";
             $this->load->helper('notification');
             createNotification($this->tenantDb, 1, $this->selected_location_id, 'notice', $msg);
+            
+            // EMAIL NOTIFICATION: Allergen/Dietary restrictions updated
+            $this->sendAllergenUpdateEmail($patientName, $suite_number, $oldAllergies, $allergies_value, $oldDietary, $dietary_preferences_value);
         }
     }
     
@@ -400,6 +406,9 @@ class Patient extends MY_Controller
         if ($cancelled_count > 0) {
             log_message('info', "PATIENT DISCHARGE (FORM) - ORDERS CANCELLED: {$cancelled_count} order item(s) cancelled for suite {$suite_number} after patient discharge via onboarding form. Patient=" . ($patient_name ?: 'UNKNOWN') . ", User=" . ($this->session->userdata('username') ?: 'UNKNOWN') . " at " . australia_datetime());
             $status_text .= " ({$cancelled_count} order(s) cancelled)";
+        } else {
+            // Send discharge email even if no orders were cancelled (via form)
+            $this->sendDischargeEmail($patient_name ?: 'Unknown', $suite_number, 0, []);
         }
         
         // Log discharge to audit trail
@@ -530,6 +539,9 @@ class Patient extends MY_Controller
                 
                 if ($cancelled_count > 0) {
                     log_message('info', "PATIENT DISCHARGE - ORDERS CANCELLED: {$cancelled_count} order item(s) cancelled for suite {$patient['suite_number']} after patient discharge. Patient ID={$patient_id}, User=" . ($this->session->userdata('username') ?: 'UNKNOWN') . " at " . australia_datetime());
+                } else {
+                    // Send discharge email even if no orders were cancelled
+                    $this->sendDischargeEmail($patient['name'] ?: 'Unknown', $patient['suite_number'], 0, []);
                 }
                 
                 // Log to audit trail
@@ -667,6 +679,9 @@ class Patient extends MY_Controller
             $this->load->helper('notification');
             $msg = "🔄 Room Transfer: Patient '{$patientName}' moved from {$old_suite_name} to {$new_suite_name}. {$ordersTransferred} meal order(s) updated.";
             createNotification($this->tenantDb, 1, $this->selected_location_id, 'notice', $msg);
+            
+            // EMAIL NOTIFICATION: Patient transferred between suites
+            $this->sendTransferEmail($patientName, $oldSuiteId, $newSuiteId, $ordersTransferred);
             
         } catch (Exception $e) {
             log_message('error', 'AUDIT TRANSFER: Exception caught - ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
@@ -823,7 +838,7 @@ class Patient extends MY_Controller
                 $discharge_time = $australiaTime->format('d M Y h:i A');
                 $unique_dates = array_unique($notification_dates);
                 
-                // Fetch cancelled item details for this suite from today's orders
+                // Fetch cancelled item details for this suite
                 $cancelled_details_sql = "SELECT 
                         opo.id,
                         opo.category_id,
@@ -846,86 +861,8 @@ class Patient extends MY_Controller
                 $detail_query = $this->tenantDb->query($cancelled_details_sql, [$suite_id, $patient_name]);
                 $cancelled_items = ($detail_query && is_object($detail_query)) ? $detail_query->result_array() : [];
                 
-                // Build HTML email
-                $email_subject = "Patient Discharged - Meals Cancelled | Suite {$suite_name} | {$patient_name}";
-                
-                $email_body = '
-                <html>
-                <head>
-                    <style>
-                        body { font-family: Arial, sans-serif; font-size: 14px; color: #333; }
-                        .header { background-color: #dc3545; color: #fff; padding: 15px 20px; border-radius: 6px 6px 0 0; }
-                        .header h2 { margin: 0; font-size: 18px; }
-                        .content { padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; }
-                        .info-table { width: 100%; margin-bottom: 15px; }
-                        .info-table td { padding: 6px 10px; }
-                        .info-table .label { font-weight: bold; width: 160px; color: #555; }
-                        table.items { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                        table.items th { background-color: #f8f9fa; padding: 8px 12px; border: 1px solid #ddd; text-align: left; font-size: 13px; }
-                        table.items td { padding: 8px 12px; border: 1px solid #ddd; font-size: 13px; }
-                        table.items tr:nth-child(even) { background-color: #fafafa; }
-                        .footer { margin-top: 20px; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h2>&#9888; Patient Discharged - Meals Cancelled</h2>
-                    </div>
-                    <div class="content">
-                        <table class="info-table">
-                            <tr><td class="label">Patient Name:</td><td>' . htmlspecialchars($patient_name) . '</td></tr>
-                            <tr><td class="label">Suite / Room:</td><td>' . htmlspecialchars($suite_name) . '</td></tr>
-                            <tr><td class="label">Discharge Time:</td><td>' . $discharge_time . '</td></tr>
-                            <tr><td class="label">Items Cancelled:</td><td>' . $cancelled_count . '</td></tr>
-                            <tr><td class="label">Affected Date(s):</td><td>' . implode(', ', $unique_dates) . '</td></tr>
-                        </table>';
-                
-                if (!empty($cancelled_items)) {
-                    $email_body .= '
-                        <h3 style="margin-top: 15px; font-size: 15px; color: #333;">Cancelled Meal Details</h3>
-                        <table class="items">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Meal</th>
-                                    <th>Menu Item</th>
-                                    <th>Option</th>
-                                    <th>Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody>';
-                    
-                    foreach ($cancelled_items as $item) {
-                        $reason_display = str_replace('_', ' ', $item['cancel_reason'] ?? '');
-                        $reason_display = ucwords($reason_display);
-                        
-                        $email_body .= '
-                                <tr>
-                                    <td>' . date('d M Y', strtotime($item['order_date'])) . '</td>
-                                    <td>' . htmlspecialchars($item['category_name'] ?? 'N/A') . '</td>
-                                    <td>' . htmlspecialchars($item['menu_name'] ?? 'N/A') . '</td>
-                                    <td>' . htmlspecialchars($item['menu_option_name'] ?? '-') . '</td>
-                                    <td>' . htmlspecialchars($reason_display) . '</td>
-                                </tr>';
-                    }
-                    
-                    $email_body .= '
-                            </tbody>
-                        </table>';
-                }
-                
-                $email_body .= '
-                        <div class="footer">
-                            <p>This is an automated notification from BizOrder system.</p>
-                            <p>Generated at: ' . $discharge_time . '</p>
-                        </div>
-                    </div>
-                </body>
-                </html>';
-                
-                $this->sendEmail('kaushika@aaria.com.au', $email_subject, $email_body);
-                
-                log_message('info', "DISCHARGE EMAIL SENT: Email notification sent to kaushika@aaria.com.au for suite $suite_name discharge ($cancelled_count items cancelled)");
+                // Send discharge email using the new template (to emine@zenncafe.com.au, CC kaushika@aaria.com.au)
+                $this->sendDischargeEmail($patient_name, $suite_id, $cancelled_count, $cancelled_items);
                 
             } catch (Exception $e) {
                 log_message('error', "DISCHARGE EMAIL FAILED: Could not send email for suite $suite_name discharge - " . $e->getMessage());
@@ -1358,6 +1295,199 @@ class Patient extends MY_Controller
         log_message('info', "ORDER TRANSFER COMPLETE: Transferred {$orders_transferred} order(s) from {$source_name} to {$dest_name} for patient '{$patient_name}'");
         
         return $orders_transferred;
+    }
+
+    /**
+     * Helper: Resolve allergen/dietary IDs (JSON) to readable names
+     */
+    private function resolveAllergenNames($json_ids) {
+        if (empty($json_ids)) return '';
+        $ids = json_decode($json_ids, true);
+        if (empty($ids) || !is_array($ids)) return '';
+        
+        $names = [];
+        foreach ($ids as $id) {
+            $result = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['name'], ['id' => $id]);
+            if (!empty($result)) {
+                $names[] = $result[0]['name'];
+            }
+        }
+        return implode(', ', $names);
+    }
+
+    /**
+     * Helper: Resolve dietary preference IDs (JSON) to readable names
+     */
+    private function resolveDietaryNames($json_ids) {
+        if (empty($json_ids)) return '';
+        $ids = json_decode($json_ids, true);
+        if (empty($ids) || !is_array($ids)) return '';
+        
+        $names = [];
+        foreach ($ids as $id) {
+            $result = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['name'], ['id' => $id]);
+            if (!empty($result)) {
+                $names[] = $result[0]['name'];
+            }
+        }
+        return implode(', ', $names);
+    }
+
+    /**
+     * Send email notification when a new patient is onboarded
+     */
+    private function sendOnboardingEmail($patientName, $suiteId, $floorId, $allergiesJson, $dietaryJson, $onboardDate) {
+        try {
+            $this->load->helper('custom');
+            
+            // Resolve suite name
+            $suite_details = $this->common_model->fetchRecordsDynamically('suites', ['bed_no'], ['id' => $suiteId]);
+            $suite_name = !empty($suite_details) ? $suite_details[0]['bed_no'] : "Suite {$suiteId}";
+            
+            // Resolve floor name
+            $floor_details = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['name'], ['id' => $floorId, 'listtype' => 'floor']);
+            $floor_name = !empty($floor_details) ? $floor_details[0]['name'] : "Floor {$floorId}";
+            
+            // Resolve allergen names
+            $allergies_list = $this->resolveAllergenNames($allergiesJson);
+            
+            // Resolve dietary preference names
+            $dietary_list = $this->resolveDietaryNames($dietaryJson);
+            
+            // Prepare data for template
+            $data = [
+                'patient_name' => $patientName,
+                'suite_name' => $suite_name,
+                'floor_name' => $floor_name,
+                'onboard_date' => $onboardDate,
+                'allergies_list' => $allergies_list,
+                'dietary_list' => $dietary_list,
+                'generated_at' => australia_datetime()
+            ];
+            
+            // Load template
+            $email_body = $this->load->view('Email/patient_onboarded', $data, TRUE);
+            $email_subject = "New Patient Onboarded | {$patientName} | Suite {$suite_name}";
+            
+            $this->sendEmail('emine@zenncafe.com.au', $email_subject, $email_body, 'info@bizadmin.com.au', 'kaushika@aaria.com.au');
+            
+            log_message('info', "ONBOARDING EMAIL SENT: Email notification sent for patient {$patientName} in suite {$suite_name}");
+        } catch (Exception $e) {
+            log_message('error', "ONBOARDING EMAIL FAILED: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send email notification when a patient is transferred between suites
+     */
+    private function sendTransferEmail($patientName, $oldSuiteId, $newSuiteId, $ordersTransferred) {
+        try {
+            $this->load->helper('custom');
+            
+            // Resolve suite names and floors
+            $old_suite_details = $this->common_model->fetchRecordsDynamically('suites', ['bed_no', 'floor'], ['id' => $oldSuiteId]);
+            $from_suite = !empty($old_suite_details) ? $old_suite_details[0]['bed_no'] : "Suite {$oldSuiteId}";
+            $old_floor_id = !empty($old_suite_details) ? $old_suite_details[0]['floor'] : null;
+            
+            $new_suite_details = $this->common_model->fetchRecordsDynamically('suites', ['bed_no', 'floor'], ['id' => $newSuiteId]);
+            $to_suite = !empty($new_suite_details) ? $new_suite_details[0]['bed_no'] : "Suite {$newSuiteId}";
+            $new_floor_id = !empty($new_suite_details) ? $new_suite_details[0]['floor'] : null;
+            
+            // Resolve floor names
+            $old_floor_details = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['name'], ['id' => $old_floor_id, 'listtype' => 'floor']);
+            $from_floor = !empty($old_floor_details) ? $old_floor_details[0]['name'] : "Floor {$old_floor_id}";
+            
+            $new_floor_details = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['name'], ['id' => $new_floor_id, 'listtype' => 'floor']);
+            $to_floor = !empty($new_floor_details) ? $new_floor_details[0]['name'] : "Floor {$new_floor_id}";
+            
+            $data = [
+                'patient_name' => $patientName,
+                'from_suite' => $from_suite,
+                'from_floor' => $from_floor,
+                'to_suite' => $to_suite,
+                'to_floor' => $to_floor,
+                'orders_transferred' => $ordersTransferred,
+                'transfer_time' => australia_datetime()
+            ];
+            
+            $email_body = $this->load->view('Email/patient_transferred', $data, TRUE);
+            $email_subject = "Patient Suite Transfer | {$patientName} | {$from_suite} → {$to_suite}";
+            
+            $this->sendEmail('emine@zenncafe.com.au', $email_subject, $email_body, 'info@bizadmin.com.au', 'kaushika@aaria.com.au');
+            
+            log_message('info', "TRANSFER EMAIL SENT: Email notification sent for patient {$patientName} transfer from {$from_suite} to {$to_suite}");
+        } catch (Exception $e) {
+            log_message('error', "TRANSFER EMAIL FAILED: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send email notification when a patient is discharged
+     */
+    private function sendDischargeEmail($patientName, $suiteId, $cancelledCount, $cancelledItems = []) {
+        try {
+            $this->load->helper('custom');
+            
+            $suite_details = $this->common_model->fetchRecordsDynamically('suites', ['bed_no'], ['id' => $suiteId]);
+            $suite_name = !empty($suite_details) ? $suite_details[0]['bed_no'] : "Suite {$suiteId}";
+            
+            $data = [
+                'patient_name' => $patientName,
+                'suite_name' => $suite_name,
+                'discharge_time' => australia_datetime(),
+                'cancelled_count' => $cancelledCount,
+                'cancelled_items' => $cancelledItems
+            ];
+            
+            $email_body = $this->load->view('Email/patient_discharged', $data, TRUE);
+            $email_subject = "Patient Discharged | {$patientName} | Suite {$suite_name}" . ($cancelledCount > 0 ? " | {$cancelledCount} Order(s) Cancelled" : "");
+            
+            $this->sendEmail('emine@zenncafe.com.au', $email_subject, $email_body, 'info@bizadmin.com.au', 'kaushika@aaria.com.au');
+            
+            log_message('info', "DISCHARGE EMAIL SENT: Email notification sent for patient {$patientName} discharge from suite {$suite_name}");
+        } catch (Exception $e) {
+            log_message('error', "DISCHARGE EMAIL FAILED: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Send email notification when allergen or dietary restrictions are updated
+     */
+    private function sendAllergenUpdateEmail($patientName, $suiteId, $oldAllergiesJson, $newAllergiesJson, $oldDietaryJson, $newDietaryJson) {
+        try {
+            $this->load->helper('custom');
+            
+            $suite_details = $this->common_model->fetchRecordsDynamically('suites', ['bed_no'], ['id' => $suiteId]);
+            $suite_name = !empty($suite_details) ? $suite_details[0]['bed_no'] : "Suite {$suiteId}";
+            
+            // Resolve old and new names
+            $old_allergies = $this->resolveAllergenNames($oldAllergiesJson);
+            $new_allergies = $this->resolveAllergenNames($newAllergiesJson);
+            $old_dietary = $this->resolveDietaryNames($oldDietaryJson);
+            $new_dietary = $this->resolveDietaryNames($newDietaryJson);
+            
+            $data = [
+                'patient_name' => $patientName,
+                'suite_name' => $suite_name,
+                'updated_by' => $this->session->userdata('username') ?: 'Unknown',
+                'updated_at' => australia_datetime(),
+                'allergies_changed' => ($oldAllergiesJson !== $newAllergiesJson),
+                'old_allergies' => $old_allergies,
+                'new_allergies' => $new_allergies,
+                'dietary_changed' => ($oldDietaryJson !== $newDietaryJson),
+                'old_dietary' => $old_dietary,
+                'new_dietary' => $new_dietary
+            ];
+            
+            $email_body = $this->load->view('Email/patient_allergen_updated', $data, TRUE);
+            $email_subject = "Allergen/Dietary Update | {$patientName} | Suite {$suite_name}";
+            
+            $this->sendEmail('emine@zenncafe.com.au', $email_subject, $email_body, 'info@bizadmin.com.au', 'kaushika@aaria.com.au');
+            
+            log_message('info', "ALLERGEN UPDATE EMAIL SENT: Email notification sent for patient {$patientName} allergen/dietary update");
+        } catch (Exception $e) {
+            log_message('error', "ALLERGEN UPDATE EMAIL FAILED: " . $e->getMessage());
+        }
     }
 
     
