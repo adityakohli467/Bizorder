@@ -73,15 +73,17 @@ class Reports extends MY_Controller {
      */
     private function getBedsServicedPerDay($from_date, $to_date) {
         // Count distinct (bed_id, patient_id) pairs per day.
-        // If two different patients are served in the same bed on the same day
-        // (e.g. Patient A discharged after breakfast, Patient B onboarded for dinner),
-        // each patient-bed combination counts as one "bed serviced".
+        // Uses suite_order_details.patient_id to correctly count multiple patients
+        // per bed on the same day (e.g. Patient A discharged after breakfast,
+        // Patient B checked in for lunch/dinner = 2 beds serviced).
+        // Falls back to opo.patient_id, then counts bed as 1 if no patient info.
         $sql = "SELECT 
                     o.date as order_date,
-                    COUNT(DISTINCT opo.bed_id, opo.patient_id) as beds_count
+                    COUNT(DISTINCT opo.bed_id, COALESCE(sd.patient_id, NULLIF(opo.patient_id, 0), opo.bed_id)) as beds_count
                 FROM orders o
                 INNER JOIN orders_to_patient_options opo ON opo.order_id = o.order_id
                 INNER JOIN suites s ON s.id = opo.bed_id
+                LEFT JOIN suite_order_details sd ON sd.id = opo.suite_order_detail_id
                 WHERE o.date >= ? AND o.date <= ?
                 AND o.status != 0
                 AND s.is_deleted = 0
@@ -104,14 +106,14 @@ class Reports extends MY_Controller {
         $month_end = date('Y-m-t', strtotime($to_date));
         
         // Get beds per day for the current month
-        // Count distinct (bed_id, patient_id) pairs — if two patients
-        // are served in the same bed on one day, each counts separately.
+        // Uses suite_order_details.patient_id for accurate patient-per-bed counting.
         $sql = "SELECT 
                     o.date as order_date,
-                    COUNT(DISTINCT opo.bed_id, opo.patient_id) as beds_count
+                    COUNT(DISTINCT opo.bed_id, COALESCE(sd.patient_id, NULLIF(opo.patient_id, 0), opo.bed_id)) as beds_count
                 FROM orders o
                 INNER JOIN orders_to_patient_options opo ON opo.order_id = o.order_id
                 INNER JOIN suites s ON s.id = opo.bed_id
+                LEFT JOIN suite_order_details sd ON sd.id = opo.suite_order_detail_id
                 WHERE o.date >= ? AND o.date <= ?
                 AND o.status != 0
                 AND s.is_deleted = 0

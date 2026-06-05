@@ -128,19 +128,12 @@ class Floor_order_model extends CI_Model {
      * Add a suite to an existing floor order
      */
     public function addSuiteToFloorOrder($floorOrderId, $suiteId, $suiteNumber, $orderComment, $userId) {
-        // Check if suite is already in this order
-        $existing = $this->getSuiteOrderDetail($floorOrderId, $suiteId);
-        if ($existing) {
-            // Update existing suite order detail
-            return $this->updateSuiteOrderDetail($existing['id'], $orderComment, $userId);
-        }
-        
         // ✅ PATIENT ID FIX: Get patient ID for this suite at order time
         // First get the order date from the floor order
         $floorOrder = $this->tenantDb->get_where('orders', ['order_id' => $floorOrderId])->row();
         $orderDate = $floorOrder ? $floorOrder->date : australia_date_only();
         
-        // Get current patient for this suite on the order date
+        // Get current patient for this suite on the order date (most recently onboarded)
         $currentPatient = $this->tenantDb->query("
             SELECT id FROM people 
             WHERE suite_number = ? AND status = 1
@@ -149,12 +142,37 @@ class Floor_order_model extends CI_Model {
             LIMIT 1
         ", [$suiteId, $orderDate])->row();
         
+        $currentPatientId = $currentPatient ? $currentPatient->id : null;
+        
+        // Check if suite is already in this order
+        $existing = $this->getSuiteOrderDetail($floorOrderId, $suiteId);
+        if ($existing) {
+            // ✅ CHECKOUT/CHECKIN FIX: If the patient has changed (e.g. Patient A discharged,
+            // Patient B checked into same bed), create a NEW suite_order_detail for the new patient.
+            // This ensures each patient's orders are tracked separately for accurate reporting.
+            if ($currentPatientId && $existing['patient_id'] != $currentPatientId) {
+                // Different patient now in this bed - create separate suite_order_detail
+                $suiteDetailData = [
+                    'floor_order_id' => $floorOrderId,
+                    'suite_id' => $suiteId,
+                    'suite_number' => $suiteNumber,
+                    'patient_id' => $currentPatientId,
+                    'order_comment' => $orderComment,
+                    'added_by' => $userId,
+                    'status' => 'active'
+                ];
+                return $this->common_model->commonRecordCreate('suite_order_details', $suiteDetailData);
+            }
+            // Same patient - update existing suite order detail
+            return $this->updateSuiteOrderDetail($existing['id'], $orderComment, $userId);
+        }
+        
         // Create new suite order detail
         $suiteDetailData = [
             'floor_order_id' => $floorOrderId,
             'suite_id' => $suiteId,
             'suite_number' => $suiteNumber,
-            'patient_id' => $currentPatient ? $currentPatient->id : null, // ✅ Store patient ID
+            'patient_id' => $currentPatientId,
             'order_comment' => $orderComment,
             'added_by' => $userId,
             'status' => 'active'

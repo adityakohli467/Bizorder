@@ -726,37 +726,94 @@ class Order extends MY_Controller
         $this->tenantDb->trans_start();
         
         try {
-            // ✅ CRITICAL FIX: Get suite order detail WITH LOCK to prevent concurrent modifications
-            // This prevents race conditions when same user has multiple tabs open
-            $existingSuiteDetail = $this->floor_order_model->getSuiteOrderDetailWithLock($floorOrderId, $bedId);
+            // ✅ CHECKOUT/CHECKIN FIX: Determine the CURRENT patient in this bed
+            $currentPatient = $this->tenantDb->query("
+                SELECT id FROM people 
+                WHERE suite_number = ? AND status = 1
+                AND (date_of_discharge IS NULL OR date_of_discharge >= ?)
+                ORDER BY date_onboarded DESC
+                LIMIT 1
+            ", [$bedId, $orderDate])->row();
+            $currentPatientId = $currentPatient ? $currentPatient->id : null;
             
-            if ($existingSuiteDetail) {
-                // Suite already exists - use existing ID
+            // Check if there's already a suite_order_detail for the CURRENT patient
+            $existingSuiteDetail = null;
+            if ($currentPatientId) {
+                $existingSuiteDetail = $this->tenantDb->query("
+                    SELECT * FROM suite_order_details 
+                    WHERE floor_order_id = ? 
+                    AND suite_id = ? 
+                    AND patient_id = ?
+                    AND status = 'active'
+                    FOR UPDATE
+                ", [$floorOrderId, $bedId, $currentPatientId])->row_array();
+            }
+            
+            // If no record for current patient, check if there's any record for this bed
+            // (indicates a different patient had the bed earlier)
+            if (empty($existingSuiteDetail)) {
+                $anySuiteDetail = $this->floor_order_model->getSuiteOrderDetailWithLock($floorOrderId, $bedId);
+                
+                if ($anySuiteDetail) {
+                    $existingPatientId = $anySuiteDetail['patient_id'] ?? null;
+                    
+                    if ($currentPatientId && $existingPatientId && $currentPatientId != $existingPatientId) {
+                        // Different patient is now in this bed - create a NEW suite_order_detail
+                        // Do NOT remove old patient's items (they stay as their breakfast/earlier meals)
+                        $suiteDetailData = [
+                            'floor_order_id' => $floorOrderId,
+                            'suite_id' => $bedId,
+                            'suite_number' => $suiteNumber,
+                            'patient_id' => $currentPatientId,
+                            'order_comment' => $orderComment,
+                            'added_by' => $userId,
+                            'status' => 'active'
+                        ];
+                        $suiteDetailId = $this->common_model->commonRecordCreate('suite_order_details', $suiteDetailData);
+                        
+                        if (!$suiteDetailId) {
+                            throw new Exception("Failed to create suite order detail for new patient");
+                        }
+                        
+                        log_message('info', "ORDER PLACE: Patient changed for bed {$bedId}. Old patient_id={$existingPatientId}, New patient_id={$currentPatientId}. Created new suite_order_detail ID={$suiteDetailId}. Floor Order={$floorOrderId}");
+                    } else {
+                        // Same patient or no patient info - use existing record
+                        $suiteDetailId = $anySuiteDetail['id'];
+                        
+                        if ($anySuiteDetail['order_comment'] != $orderComment) {
+                            $this->floor_order_model->updateSuiteOrderDetail($suiteDetailId, $orderComment, $userId);
+                        }
+                        
+                        // Remove existing menu items (same patient re-ordering)
+                        $this->floor_order_model->removeExistingMenuItems($floorOrderId, $bedId, $suiteDetailId);
+                    }
+                } else {
+                    // No suite_order_detail exists at all - create new one
+                    $suiteDetailId = $this->floor_order_model->addSuiteToFloorOrder(
+                        $floorOrderId, 
+                        $bedId, 
+                        $suiteNumber, 
+                        $orderComment, 
+                        $userId
+                    );
+                    
+                    if (!$suiteDetailId) {
+                        throw new Exception("Failed to add suite to floor order");
+                    }
+                }
+            } else {
+                // Found existing suite_order_detail for CURRENT patient - re-order scenario
                 $suiteDetailId = $existingSuiteDetail['id'];
                 
-                // Update suite order detail comment if changed
                 if ($existingSuiteDetail['order_comment'] != $orderComment) {
                     $this->floor_order_model->updateSuiteOrderDetail($suiteDetailId, $orderComment, $userId);
                 }
-            } else {
-                // Suite doesn't exist - create new one
-                $suiteDetailId = $this->floor_order_model->addSuiteToFloorOrder(
-                    $floorOrderId, 
-                    $bedId, 
-                    $suiteNumber, 
-                    $orderComment, 
-                    $userId
-                );
                 
-                if (!$suiteDetailId) {
-                    throw new Exception("Failed to add suite to floor order");
-                }
+                // Remove ONLY this patient's items (not other patients' items for same bed)
+                $this->tenantDb->where('order_id', $floorOrderId)
+                    ->where('suite_order_detail_id', $suiteDetailId)
+                    ->delete('orders_to_patient_options');
             }
-            
-            // Remove existing menu items for this suite
-            // ✅ CRITICAL FIX: Pass suiteDetailId directly to prevent race conditions
-            // Using the ID returned from addSuiteToFloorOrder is more reliable than querying again
-            $this->floor_order_model->removeExistingMenuItems($floorOrderId, $bedId, $suiteDetailId);
             
             // Process menu items
             $menuItems = [];
