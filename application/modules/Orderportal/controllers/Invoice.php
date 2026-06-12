@@ -23,6 +23,7 @@ class Invoice extends MY_Controller
    	      $this->load->model('order_model');
    	      $this->load->model('general_model');
        !$this->ion_auth->logged_in() ? redirect('auth/login', 'refresh') : '';
+        $this->restrictHospitalRole();
         $this->POST  = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
         $this->selected_location_id = $this->session->userdata('default_location_id');
         

@@ -7,6 +7,7 @@ class Menuplanner extends MY_Controller {
 	    $this->load->model('configfoodmenu_model');
 	    $this->selected_location_id = $this->session->userdata('location_id');
 	   !$this->ion_auth->logged_in() ? redirect('auth/login', 'refresh') : '';
+	    $this->restrictHospitalRole();
 	    $this->load->model('menu_model');
 	    $this->load->model('common_model');
 	    $this->load->helper('custom'); // Load custom helper for Australia timezone functions

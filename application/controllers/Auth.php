@@ -144,7 +144,9 @@ class Auth extends MY_Controller
 				
 				$role = $this->ion_auth->get_users_groups()->row();
                 $role_id = $role ? $role->id : null;
+                $role_name = $role ? $role->name : null;
                 $this->session->set_userdata('role_id',$role_id);
+                $this->session->set_userdata('role_name',$role_name);
         
 				if($this->ion_auth->is_admin()){
 				 $this->session->set_userdata('is_admin', $this->ion_auth->is_admin());
@@ -161,7 +163,14 @@ class Auth extends MY_Controller
              $this->logout();
              $this->session->set_flashdata('message', 'Your role has been deleted by admin, please contact admin');
              redirect('auth/login', 'refresh');
-             } 
+             }
+            
+            // Hospital role - redirect directly to manage suites page
+            if ($role_name && strtolower(trim($role_name)) === 'hospital') {
+                redirect('Orderportal/Hospitalconfig/List');
+                return;
+            }
+            
 				$url = base_url("Orderportal"); redirect($url);
 				 
 			}

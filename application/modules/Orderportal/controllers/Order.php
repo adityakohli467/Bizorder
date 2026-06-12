@@ -18,6 +18,7 @@ class Order extends MY_Controller
    	      $this->load->model('floor_order_model'); // Load the new floor order model
    	      $this->load->helper('custom'); // Load custom helper for Australia timezone functions
        !$this->ion_auth->logged_in() ? redirect('auth/login', 'refresh') : '';
+        $this->restrictHospitalRole();
         $this->POST  = filter_input_array(INPUT_POST, FILTER_SANITIZE_STRING);
         $this->selected_location_id = $this->session->userdata('default_location_id');
         

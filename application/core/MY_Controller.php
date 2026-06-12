@@ -113,6 +113,18 @@ class MY_Controller extends MX_Controller
  //=================================================================================================
     
     }
+    
+    /**
+     * Restrict access for Hospital role users.
+     * Hospital role can only access Hospitalconfig controller.
+     * Call this in constructors of controllers that Hospital role should NOT access.
+     */
+    protected function restrictHospitalRole() {
+        $roleName = $this->session->userdata('role_name');
+        if ($roleName && strtolower(trim($roleName)) === 'hospital') {
+            redirect('Orderportal/Hospitalconfig/List');
+        }
+    }
    
    function errorMessage(){
        $html='<!DOCTYPE html>

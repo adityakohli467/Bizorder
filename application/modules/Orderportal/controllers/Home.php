@@ -148,24 +148,34 @@ class Home extends MY_Controller {
         $emailSettings = $this->general_model->fetchSmtpSettings('9999','9999');
         $this->configureSMTP($emailSettings);
           
-        // 
-        if($this->ion_auth->get_users_groups()->row()->id == 1){
+        // Check role name for Hospital role (dynamically created, ID not fixed)
+        $userGroup = $this->ion_auth->get_users_groups()->row();
+        $groupId = $userGroup->id;
+        $groupName = isset($userGroup->name) ? strtolower(trim($userGroup->name)) : '';
+        
+        // Hospital role - redirect to manage suites page only
+        if ($groupName === 'hospital') {
+            redirect('Orderportal/Hospitalconfig/List');
+            return;
+        }
+        
+        if($groupId == 1){
 // 			$this->load->view('Dashboard/dashboardAdmin',$data);
           // dashboardd for admin and chef are same
           $this->dashboardChef();
-		}else if($this->ion_auth->get_users_groups()->row()->id == 2){
+		}else if($groupId == 2){
 		    $this->dashboardChef();
-		}else if($this->ion_auth->get_users_groups()->row()->id == 3){
+		}else if($groupId == 3){
 		    $this->dashboardNurse();
 			
-		}else if($this->ion_auth->get_users_groups()->row()->id == 6){
+		}else if($groupId == 6){
 		    // pass true to load reception screen*(where all patent can place order) rather than nurse portal
 		    $this->dashboardNurse(true);
 			
-		}else if($this->ion_auth->get_users_groups()->row()->id == 4){
+		}else if($groupId == 4){
 		    // Patient portal - use same interface as reception for now
 		    $this->dashboardNurse(true);
-		}else if($this->ion_auth->get_users_groups()->row()->id == 7){
+		}else if($groupId == 7){
 		    // Staff role (ID 7) - restricted access to Production Form and Today's Labels only
 		    $this->dashboardStaff();
 		}

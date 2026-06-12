@@ -8,6 +8,7 @@ class Reports extends MY_Controller {
         $this->load->model('common_model');
         // Check if user is logged in
         !$this->ion_auth->logged_in() ? redirect('auth/login', 'refresh') : '';
+        $this->restrictHospitalRole();
     }
     
     /**

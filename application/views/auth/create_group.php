@@ -79,18 +79,24 @@
 }
 </style>
 
-<!-- Include Global Form Validation Script -->
-<script src="<?php echo base_url('theme-assets/js/form-validation.js'); ?>"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const roleNameInput = document.getElementById('group_name');
     const descriptionTextarea = document.getElementById('description');
-    const form = document.querySelector('form');
+    const form = document.querySelector('form[action*="create_group"]');
+    
+    if (!form || !roleNameInput) return;
+    
+    // Prevent global form-validation.js from hijacking this form
+    form.setAttribute('data-validation-initialized', 'true');
+    
+    // Track if user has interacted with fields
+    let roleNameTouched = false;
+    let descriptionTouched = false;
     
     // Real-time validation for role name
     roleNameInput.addEventListener('input', function() {
-        roleNameTouched = true; // Mark as touched when user starts typing
+        roleNameTouched = true;
         const value = this.value;
         const pattern = /^[a-zA-Z0-9\s\-_]+$/;
         
@@ -99,23 +105,23 @@ document.addEventListener('DOMContentLoaded', function() {
             this.value = value.replace(/[^a-zA-Z0-9\s\-_]/g, '');
         }
         
-        // Show character count
         updateCharacterCount(this, 50);
-        validateFormRealTime(); // Check form validity
+        showFieldValidation();
     });
     
     // Character count for description
-    descriptionTextarea.addEventListener('input', function() {
-        descriptionTouched = true; // Mark as touched when user starts typing
-        updateCharacterCount(this, 255);
-        validateFormRealTime(); // Check form validity
-    });
+    if (descriptionTextarea) {
+        descriptionTextarea.addEventListener('input', function() {
+            descriptionTouched = true;
+            updateCharacterCount(this, 255);
+            showFieldValidation();
+        });
+    }
     
     function updateCharacterCount(element, maxLength) {
         const currentLength = element.value.length;
         const remaining = maxLength - currentLength;
         
-        // Find or create character count display
         let countDisplay = element.parentNode.querySelector('.char-count');
         if (!countDisplay) {
             countDisplay = document.createElement('small');
@@ -123,9 +129,8 @@ document.addEventListener('DOMContentLoaded', function() {
             element.parentNode.appendChild(countDisplay);
         }
         
-        countDisplay.textContent = `${currentLength}/${maxLength} characters`;
+        countDisplay.textContent = currentLength + '/' + maxLength + ' characters';
         
-        // Change color based on remaining characters
         if (remaining < 10) {
             countDisplay.className = 'char-count text-warning';
         } else if (remaining < 0) {
@@ -135,74 +140,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Track if user has interacted with fields
-    let roleNameTouched = false;
-    let descriptionTouched = false;
-    
-    // Real-time form validation and button state management
-    function validateFormRealTime() {
+    // Visual feedback only - does NOT disable submit button
+    function showFieldValidation() {
         const roleName = roleNameInput.value.trim();
-        const description = descriptionTextarea.value.trim();
-        const submitBtn = form.querySelector('button[type="submit"]');
         
-        let isValid = true;
-        
-        // Validate role name (only show validation if user has interacted)
-        if (!roleName || roleName.length < 2 || roleName.length > 50 || !/^[a-zA-Z0-9\s\-_]+$/.test(roleName)) {
-            isValid = false;
-            if (roleNameTouched) {
+        if (roleNameTouched) {
+            if (!roleName || roleName.length < 2 || roleName.length > 50 || !/^[a-zA-Z0-9\s\-_]+$/.test(roleName)) {
                 roleNameInput.classList.add('is-invalid');
                 roleNameInput.classList.remove('is-valid');
-            }
-        } else {
-            if (roleNameTouched) {
+            } else {
                 roleNameInput.classList.add('is-valid');
                 roleNameInput.classList.remove('is-invalid');
             }
         }
         
-        // Validate description (optional but check length if provided)
-        if (description && description.length > 255) {
-            isValid = false;
-            if (descriptionTouched) {
+        if (descriptionTouched && descriptionTextarea) {
+            const description = descriptionTextarea.value.trim();
+            if (description && description.length > 255) {
                 descriptionTextarea.classList.add('is-invalid');
                 descriptionTextarea.classList.remove('is-valid');
-            }
-        } else if (description) {
-            if (descriptionTouched) {
-                descriptionTextarea.classList.add('is-valid');
-                descriptionTextarea.classList.remove('is-invalid');
-            }
-        } else {
-            if (descriptionTouched) {
+            } else {
                 descriptionTextarea.classList.remove('is-invalid', 'is-valid');
             }
         }
-        
-        // Enable/disable submit button
-        if (submitBtn) {
-            submitBtn.disabled = !isValid;
-            if (isValid) {
-                submitBtn.classList.remove('btn-secondary');
-                submitBtn.classList.add('btn-success');
-            } else {
-                submitBtn.classList.remove('btn-success');
-                submitBtn.classList.add('btn-secondary');
-            }
-        }
-        
-        return isValid;
     }
     
-    // Enhanced form validation
+    // Form submission - validate and allow native submit
     form.addEventListener('submit', function(e) {
         const roleName = roleNameInput.value.trim();
-        const description = descriptionTextarea.value.trim();
+        const description = descriptionTextarea ? descriptionTextarea.value.trim() : '';
         
         let isValid = true;
         let errorMessage = '';
         
-        // Validate role name
         if (!roleName) {
             isValid = false;
             errorMessage += 'Role Name is required.\n';
@@ -214,10 +184,9 @@ document.addEventListener('DOMContentLoaded', function() {
             errorMessage += 'Role Name must be less than 50 characters.\n';
         } else if (!/^[a-zA-Z0-9\s\-_]+$/.test(roleName)) {
             isValid = false;
-            errorMessage += 'Role Name contains invalid characters. Only letters, numbers, spaces, hyphens (-) and underscores (_) are allowed.\n';
+            errorMessage += 'Role Name contains invalid characters.\n';
         }
         
-        // Validate description (optional but if provided, check length)
         if (description && description.length > 255) {
             isValid = false;
             errorMessage += 'Description must be less than 255 characters.\n';
@@ -225,28 +194,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!isValid) {
             e.preventDefault();
-            alert('Please fix the following errors:\n\n' + errorMessage);
+            roleNameInput.classList.add('is-invalid');
+            roleNameInput.focus();
             return false;
         }
         
-        // Show loading state
-        const submitBtn = form.querySelector('button[type="submit"]');
+        // Show loading state - form will submit naturally
+        var submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="ri-loader-2-line"></i> Creating Role...';
         }
     });
     
-    // Initialize character counts and form validation
+    // Initialize character counts
     updateCharacterCount(roleNameInput, 50);
-    updateCharacterCount(descriptionTextarea, 255);
-    
-    // Initial button state (disabled until valid input)
-    const submitBtn = form.querySelector('button[type="submit"]');
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.classList.remove('btn-success');
-        submitBtn.classList.add('btn-secondary');
+    if (descriptionTextarea) {
+        updateCharacterCount(descriptionTextarea, 255);
     }
 });
 </script>

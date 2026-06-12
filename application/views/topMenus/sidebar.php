@@ -47,9 +47,38 @@
                 $userGroups = $this->ion_auth->get_users_groups()->row();
                 $alternativeRoleId = ($userGroups && isset($userGroups->id)) ? $userGroups->id : null;
                 $isNurse = ($currentRoleId == 3 || $alternativeRoleId == 3);
+                
+                // Check if user is Hospital role
+                $roleName = $this->session->userdata('role_name');
+                $isHospital = ($roleName && strtolower(trim($roleName)) === 'hospital');
                 ?>
 
-                <?php if ($isNurse) : ?>
+                <?php if ($isHospital) : ?>
+                    <!-- Hospital role - Show only Manage Suites -->
+                    <li class="nav-item">
+                        <a class="nav-link menu-link" href="#hospital-menu-collapse"
+                            data-bs-toggle="collapse"
+                            role="button"
+                            aria-expanded="true"
+                            aria-controls="hospital-menu-collapse"
+                            onclick="toggleNurseMenu(event)">
+                            <i class="ri-hospital-line me-2"></i>
+                            <span data-key="t-hospital-menu">Suite Management</span>
+                            <i class="ri-arrow-down-s-line ms-auto"></i>
+                        </a>
+
+                        <div class="menu-dropdown show" id="hospital-menu-collapse">
+                            <ul class="nav nav-sm flex-column">
+                                <li class="nav-item">
+                                    <a href="<?= base_url('Orderportal/Hospitalconfig/List') ?>" class="nav-link">
+                                        <i class="ri-hospital-line me-2"></i>
+                                        <span>Manage Suites</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    </li>
+                <?php elseif ($isNurse) : ?>
                     <!-- Nurse-specific navigation - Show only Hospital Admin dropdown -->
                     <li class="nav-item">
                         <a class="nav-link menu-link" href="#nurse-menu-collapse"
