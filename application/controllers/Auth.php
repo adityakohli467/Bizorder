@@ -632,7 +632,8 @@ class Auth extends MY_Controller
 		}
 
 		$tables = $this->config->item('tables', 'ion_auth');
-    	$roles = get_all_roles($this->ion_auth,$this->session->userdata('location_id'));
+    	$locationId = $this->session->userdata('location_id') ? $this->session->userdata('location_id') : ($this->session->userdata('default_location_id') ? $this->session->userdata('default_location_id') : 0);
+    	$roles = get_all_roles($this->ion_auth, $locationId);
     	
     	$conditions = array('is_deleted' => 0 ,'listtype' => 'floor');
         $this->data['departmentListData'] = $this->common_model->fetchRecordsDynamically('foodmenuconfig','',$conditions);
@@ -867,7 +868,8 @@ class Auth extends MY_Controller
 
 		// display the edit user form
 		$this->data['csrf'] = $this->_get_csrf_nonce();
-	    $roles = get_all_roles($this->ion_auth,$this->session->userdata('location_id'));
+	    $editLocationId = $this->session->userdata('location_id') ? $this->session->userdata('location_id') : ($this->session->userdata('default_location_id') ? $this->session->userdata('default_location_id') : 0);
+	    $roles = get_all_roles($this->ion_auth, $editLocationId);
 
 		// set the flash data error message if there is one
 		$this->data['message'] = (validation_errors() ? validation_errors() : ($this->ion_auth->errors() ? $this->ion_auth->errors() : $this->session->flashdata('message')));
