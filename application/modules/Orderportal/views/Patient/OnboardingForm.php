@@ -410,9 +410,9 @@ input[type=checkbox], input[type=radio] {
                         <!-- Form Buttons -->
                         <div id="form-buttons" class="flex justify-between mt-8">
                             <?php 
-                            // For nurses (role_id == 3), back button goes to Suites page
+                            // For nurses (role_id == 3) and hospital role (role_id == 16), back button goes to Suites page
                             // For others, back button goes to Onboarding list
-                            $backUrl = ($this->session->userdata('role_id') == 3) 
+                            $backUrl = (in_array($this->session->userdata('role_id'), [3, 16])) 
                                 ? base_url('Orderportal/Hospitalconfig/List') 
                                 : base_url('Orderportal/Patient/Onboarding');
                             ?>
@@ -420,7 +420,7 @@ input[type=checkbox], input[type=radio] {
                                 <i class="fa-solid fa-arrow-left mr-2"></i> Back
                             </button></a>
                             <div class="d-flex gap-2">
-                                <?php if (!empty($patientDetails['id']) && $patientDetails['status'] == 1 && $this->session->userdata('role_id') != 3): ?>
+                                <?php if (!empty($patientDetails['id']) && $patientDetails['status'] == 1): ?>
                                 <button type="button" id="discharge-btn" class="px-6 py-2 bg-orange-500 text-white rounded-lg flex items-center hover:bg-orange-600 transition-colors" style="background-color: #f59e0b; color: white; border: none;" data-patient-id="<?php echo $patientDetails['id']; ?>" data-patient-name="<?php echo htmlspecialchars($patientDetails['name']); ?>">
                                     <i class="fa-solid fa-right-from-bracket mr-2" style="color: white !important;"></i> Discharge
                                 </button>

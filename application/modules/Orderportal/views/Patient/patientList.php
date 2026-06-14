@@ -135,9 +135,6 @@
                                     <i class="ri-edit-box-line label-icon align-middle fs-12 me-2"></i>View/Edit
                                 </a>
                             </div>
-                            <?php if($this->session->userdata('role_id') != 3) { 
-                                // Hide Remove & Discharge buttons for nurses
-                            ?>
                             <div class="discharge">
                                 <button class="btn btn-warning discharge-btn" data-rel-id="<?php echo $customer['id']; ?>" data-patient-name="<?php echo htmlspecialchars($customer['name']); ?>">
                                     <i class="ri-logout-box-r-line label-icon align-middle fs-12 me-2"></i>Discharge
@@ -148,7 +145,6 @@
                                     <i class="ri-delete-bin-line label-icon align-middle fs-12 me-2"></i>Remove
                                 </button>
                             </div>
-                            <?php } ?>
                         </div>
                     </td>
                 </tr>
@@ -255,15 +251,11 @@
                                                                                 <i class="ri-edit-box-line label-icon align-middle fs-12 me-2"></i>View/Edit
                                                                             </a>
                                                                         </div>
-                                                                        <?php if($this->session->userdata('role_id') != 3) { 
-                                                                            // Hide Remove button for nurses
-                                                                        ?>
                                                                         <div class="remove">
                                                                             <button class="btn btn btn-danger remove-item-btn" data-rel-id="<?php echo $customer['id']; ?>">
                                                                                 <i class="ri-delete-bin-line label-icon align-middle fs-12 me-2"></i>Remove
                                                                             </button>
                                                                         </div>
-                                                                        <?php } ?>
                                                                     </div>
                                                                 </td>
                                                             </tr>
