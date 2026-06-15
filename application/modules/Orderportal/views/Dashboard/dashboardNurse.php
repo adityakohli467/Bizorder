@@ -1416,14 +1416,15 @@
                         const vCuisineStrs = vCuisineIds.map(String).sort();
                         
                         // EXACT MATCH for cuisine:
-                        // Variation must contain ALL of patient's dietary preferences
-                        // e.g. patient ["29","30","31"] (GF+DF+LC) only matches variation with all three combined
+                        // Variation must have EXACTLY the same dietary preferences as patient
+                        // e.g. patient ["29","30"] (NoPork+NoBeef) only matches variation with exactly those two combined
                         if (patientIds.length === 0) {
                             // No dietary preferences: only match standard variations (empty cuisine)
                             if (vCuisineStrs.length !== 0) return false;
                         } else {
-                            // Has dietary preferences: variation must contain ALL patient preferences
+                            // Has dietary preferences: variation must have EXACTLY the same cuisine set
                             if (vCuisineStrs.length === 0) return false; // Empty cuisine = standard, not for dietary patients
+                            if (vCuisineStrs.length !== patientIds.length) return false; // Must be same size
                             if (!patientIds.every(id => vCuisineStrs.includes(id))) return false;
                         }
                     }
@@ -3000,9 +3001,9 @@
                                                                 // No dietary preferences: show only standard items (empty cuisine)
                                                                 matchesCuisine = (itemSet.length === 0);
                                                             } else {
-                                                                // Has preferences: item cuisines must be a non-empty subset of patient preferences
-                                                                // e.g. item ["29"] (GF) matches patient ["29","30"] (GF+DF)
-                                                                matchesCuisine = (itemSet.length > 0) && itemSet.every(id => patientSet.includes(id));
+                                                                // Has preferences: item cuisines must EXACTLY match patient preferences
+                                                                // e.g. patient ["29","30"] (NoPork+NoBeef) only matches item with exactly ["29","30"]
+                                                                matchesCuisine = (itemSet.length > 0) && (itemSet.length === patientSet.length) && itemSet.every(id => patientSet.includes(id));
                                                             }
                                                         } // end if (!isCommonItem)
                                                         
@@ -3207,8 +3208,8 @@ ${(option._mergedCuisineIds && option._mergedCuisineIds.length > 0 && !(menu.is_
                                                 // No dietary preferences: show only standard items (empty cuisine)
                                                 matchesCuisine = (itemSet.length === 0);
                                             } else {
-                                                // Has preferences: item cuisines must be a non-empty subset of patient preferences
-                                                matchesCuisine = (itemSet.length > 0) && itemSet.every(id => patientSet.includes(id));
+                                                // Has preferences: item cuisines must EXACTLY match patient preferences
+                                                matchesCuisine = (itemSet.length > 0) && (itemSet.length === patientSet.length) && itemSet.every(id => patientSet.includes(id));
                                             }
                                         } // end if (!isCommonItem)
                                         
