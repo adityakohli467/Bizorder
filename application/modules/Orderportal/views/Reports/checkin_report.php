@@ -109,10 +109,11 @@
                                     <thead class="table-light">
                                         <tr>
                                             <th style="width:5%;">#</th>
-                                            <th style="width:25%;">Date</th>
-                                            <th style="width:30%;">Customer Name</th>
-                                            <th style="width:25%;">Check Out Time</th>
-                                            <th style="width:15%;">Suite No</th>
+                                            <th style="width:18%;">Date</th>
+                                            <th style="width:25%;">Customer Name</th>
+                                            <th style="width:17%;">Check In Time</th>
+                                            <th style="width:22%;">Check Out Time</th>
+                                            <th style="width:13%;">Suite No</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -122,6 +123,12 @@
                                                     $has_checkout = (!empty($row['date_of_discharge']) && $row['date_of_discharge'] != '0000-00-00');
                                                     $checkin_date = !empty($row['date_onboarded'])
                                                         ? date('d M Y', strtotime($row['date_onboarded'])) : 'N/A';
+
+                                                    if (!empty($row['time_onboarded']) && $row['time_onboarded'] != '0000-00-00 00:00:00') {
+                                                        $checkin_time = date('h:i A', strtotime($row['time_onboarded']));
+                                                    } else {
+                                                        $checkin_time = null;
+                                                    }
 
                                                     if (!empty($row['time_discharged']) && $row['time_discharged'] != '0000-00-00 00:00:00') {
                                                         $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
@@ -135,6 +142,13 @@
                                                     <td><?php echo $i++; ?></td>
                                                     <td><strong><?php echo $checkin_date; ?></strong></td>
                                                     <td><?php echo htmlspecialchars($row['patient_name'] ?: 'N/A'); ?></td>
+                                                    <td>
+                                                        <?php if ($checkin_time !== null): ?>
+                                                            <span class="badge bg-primary"><?php echo $checkin_time; ?></span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">N/A</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td>
                                                         <?php if ($checkout !== null): ?>
                                                             <span class="badge bg-secondary"><?php echo $checkout; ?></span>
@@ -151,7 +165,7 @@
                                             <?php endforeach; ?>
                                         <?php else: ?>
                                             <tr>
-                                                <td colspan="5" class="text-center text-muted py-4">
+                                                <td colspan="6" class="text-center text-muted py-4">
                                                     No check-ins or active customers found for this date range.
                                                 </td>
                                             </tr>

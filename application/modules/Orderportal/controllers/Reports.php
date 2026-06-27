@@ -508,10 +508,17 @@ class Reports extends MY_Controller {
         fputcsv($output, ['Date Range: ' . date('d M Y', strtotime($from_date)) . ' to ' . date('d M Y', strtotime($to_date))]);
         fputcsv($output, []);
 
-        // Headers (exactly as requested: Date, Customer Name, Check Out Time, Suite No)
-        fputcsv($output, ['Date', 'Customer Name', 'Check Out Time', 'Suite No']);
+        // Headers (Date, Customer Name, Check In Time, Check Out Time, Suite No)
+        fputcsv($output, ['Date', 'Customer Name', 'Check In Time', 'Check Out Time', 'Suite No']);
 
         foreach ($records as $row) {
+            $checkin = '';
+            if (!empty($row['time_onboarded']) && $row['time_onboarded'] != '0000-00-00 00:00:00') {
+                $checkin = date('h:i A', strtotime($row['time_onboarded']));
+            } else {
+                $checkin = 'N/A';
+            }
+
             $checkout = '';
             if (!empty($row['time_discharged']) && $row['time_discharged'] != '0000-00-00 00:00:00') {
                 $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
@@ -524,6 +531,7 @@ class Reports extends MY_Controller {
             fputcsv($output, [
                 !empty($row['date_onboarded']) ? date('d M Y', strtotime($row['date_onboarded'])) : 'N/A',
                 $row['patient_name'] ?: 'N/A',
+                $checkin,
                 $checkout,
                 $row['suite_number'] ?: 'N/A'
             ]);
