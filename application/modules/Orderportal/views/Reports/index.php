@@ -113,6 +113,10 @@
                                                 onclick="exportPatientReport()">
                                             <i class="ri-user-line"></i> Patient Report
                                         </button>
+                                        <a href="<?php echo base_url('Orderportal/Reports/checkinReport'); ?>" 
+                                           class="btn btn-success me-2">
+                                            <i class="ri-login-box-line"></i> Check-ins &amp; Active
+                                        </a>
                                         <a href="<?php echo base_url('Orderportal/Reports/cancelledOrders'); ?>" 
                                            class="btn btn-danger me-2">
                                             <i class="ri-delete-bin-line"></i> Cancelled Orders

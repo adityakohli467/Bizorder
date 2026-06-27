@@ -411,6 +411,129 @@ class Reports extends MY_Controller {
     }
     
     /**
+     * Check-ins & Active Customers Report
+     *
+     * Lists every check-in (one row per person) plus all currently active customers
+     * for the selected date range. A check-in is shown even if the customer checked
+     * out later the same day. Because the report is built directly from the people
+     * table (one row per person), a suite that is checked-out and then re-occupied
+     * on the same day produces TWO rows - the new occupant never overrides the
+     * previous occupant's record.
+     */
+    public function checkinReport() {
+        $from_date = $this->input->post('from_date') ?: $this->input->get('from_date');
+        $to_date   = $this->input->post('to_date') ?: $this->input->get('to_date');
+
+        if (empty($from_date)) {
+            $from_date = date('Y-m-d');
+        }
+        if (empty($to_date)) {
+            $to_date = date('Y-m-d');
+        }
+
+        $records = $this->getCheckinReport($from_date, $to_date);
+        $records = is_array($records) ? $records : [];
+
+        $total_active    = 0;
+        $total_checkedout = 0;
+        foreach ($records as $row) {
+            if (!empty($row['date_of_discharge'])) {
+                $total_checkedout++;
+            } else {
+                $total_active++;
+            }
+        }
+
+        $data['records']          = $records;
+        $data['from_date']        = $from_date;
+        $data['to_date']          = $to_date;
+        $data['total_records']    = count($records);
+        $data['total_active']     = $total_active;
+        $data['total_checkedout'] = $total_checkedout;
+        $data['page_title']       = 'Check-ins & Active Customers Report';
+        $data['pagefor']          = 'reports';
+
+        $this->load->view('general/header', $data);
+        $this->load->view('Orderportal/Reports/checkin_report', $data);
+        $this->load->view('general/footer', $data);
+    }
+
+    /**
+     * Build the check-ins / active customers dataset.
+     *
+     * One row per person from the people table, filtered by check-in date
+     * (date_onboarded) within the selected range. This naturally returns
+     * multiple rows for a suite that was re-occupied on the same day.
+     */
+    private function getCheckinReport($from_date, $to_date) {
+        $sql = "SELECT
+                    p.id                 AS patient_id,
+                    p.name               AS patient_name,
+                    p.date_onboarded     AS date_onboarded,
+                    p.time_onboarded     AS time_onboarded,
+                    p.date_of_discharge  AS date_of_discharge,
+                    p.time_discharged    AS time_discharged,
+                    p.status             AS patient_status,
+                    s.bed_no             AS suite_number,
+                    fmc.name             AS floor_name
+                FROM people p
+                LEFT JOIN suites s ON s.id = p.suite_number AND s.is_deleted = 0
+                LEFT JOIN foodmenuconfig fmc ON fmc.id = p.floor_number AND fmc.listtype = 'floor'
+                WHERE p.date_onboarded IS NOT NULL
+                  AND p.date_onboarded >= ?
+                  AND p.date_onboarded <= ?
+                ORDER BY s.bed_no ASC, p.date_onboarded ASC, p.time_discharged ASC, p.id ASC";
+
+        $query = $this->tenantDb->query($sql, [$from_date, $to_date]);
+        return $query->result_array();
+    }
+
+    /**
+     * Export the Check-ins & Active Customers report to CSV.
+     */
+    public function exportCheckinReport() {
+        $from_date = $this->input->post('from_date') ?: date('Y-m-d');
+        $to_date   = $this->input->post('to_date') ?: date('Y-m-d');
+
+        $records = $this->getCheckinReport($from_date, $to_date);
+        $records = is_array($records) ? $records : [];
+
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="checkin_report_' . date('Y-m-d_His') . '.csv"');
+
+        $output = fopen('php://output', 'w');
+
+        // Title
+        fputcsv($output, ['Check-ins & Active Customers Report']);
+        fputcsv($output, ['Date Range: ' . date('d M Y', strtotime($from_date)) . ' to ' . date('d M Y', strtotime($to_date))]);
+        fputcsv($output, []);
+
+        // Headers (exactly as requested: Date, Customer Name, Check Out Time, Suite No)
+        fputcsv($output, ['Date', 'Customer Name', 'Check Out Time', 'Suite No']);
+
+        foreach ($records as $row) {
+            $checkout = '';
+            if (!empty($row['time_discharged']) && $row['time_discharged'] != '0000-00-00 00:00:00') {
+                $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
+            } elseif (!empty($row['date_of_discharge']) && $row['date_of_discharge'] != '0000-00-00') {
+                $checkout = date('d M Y', strtotime($row['date_of_discharge']));
+            } else {
+                $checkout = 'Still Checked In';
+            }
+
+            fputcsv($output, [
+                !empty($row['date_onboarded']) ? date('d M Y', strtotime($row['date_onboarded'])) : 'N/A',
+                $row['patient_name'] ?: 'N/A',
+                $checkout,
+                $row['suite_number'] ?: 'N/A'
+            ]);
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    /**
      * List all order snapshots
      * Shows comprehensive view of all historical snapshots
      */
