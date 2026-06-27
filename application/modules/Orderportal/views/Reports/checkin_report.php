@@ -125,7 +125,9 @@
                                                         ? date('d M Y', strtotime($row['date_onboarded'])) : 'N/A';
 
                                                     if (!empty($row['time_onboarded']) && $row['time_onboarded'] != '0000-00-00 00:00:00') {
-                                                        $checkin_time = date('h:i A', strtotime($row['time_onboarded']));
+                                                        $checkin_time = date('d M Y h:i A', strtotime($row['time_onboarded']));
+                                                    } elseif (!empty($row['date_onboarded'])) {
+                                                        $checkin_time = date('d M Y', strtotime($row['date_onboarded']));
                                                     } else {
                                                         $checkin_time = null;
                                                     }

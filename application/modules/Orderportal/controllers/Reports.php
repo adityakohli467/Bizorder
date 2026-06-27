@@ -514,7 +514,9 @@ class Reports extends MY_Controller {
         foreach ($records as $row) {
             $checkin = '';
             if (!empty($row['time_onboarded']) && $row['time_onboarded'] != '0000-00-00 00:00:00') {
-                $checkin = date('h:i A', strtotime($row['time_onboarded']));
+                $checkin = date('d M Y h:i A', strtotime($row['time_onboarded']));
+            } elseif (!empty($row['date_onboarded'])) {
+                $checkin = date('d M Y', strtotime($row['date_onboarded']));
             } else {
                 $checkin = 'N/A';
             }
