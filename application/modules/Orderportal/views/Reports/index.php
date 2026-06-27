@@ -113,10 +113,11 @@
                                                 onclick="exportPatientReport()">
                                             <i class="ri-user-line"></i> Patient Report
                                         </button>
-                                        <a href="<?php echo base_url('Orderportal/Reports/checkinReport'); ?>" 
-                                           class="btn btn-success me-2">
+                                        <button type="button" 
+                                                class="btn btn-success me-2" 
+                                                onclick="openCheckinReport()">
                                             <i class="ri-login-box-line"></i> Check-ins &amp; Active
-                                        </a>
+                                        </button>
                                         <a href="<?php echo base_url('Orderportal/Reports/cancelledOrders'); ?>" 
                                            class="btn btn-danger me-2">
                                             <i class="ri-delete-bin-line"></i> Cancelled Orders
@@ -602,6 +603,15 @@ function exportBedsServiced() {
     document.body.appendChild(form);
     form.submit();
     document.body.removeChild(form);
+}
+
+function openCheckinReport() {
+    const fromDate = document.querySelector('input[name="from_date"]').value;
+    const toDate = document.querySelector('input[name="to_date"]').value;
+    const url = '<?php echo base_url('Orderportal/Reports/checkinReport'); ?>'
+        + '?from_date=' + encodeURIComponent(fromDate)
+        + '&to_date=' + encodeURIComponent(toDate);
+    window.location.href = url;
 }
 
 function exportPatientReport() {

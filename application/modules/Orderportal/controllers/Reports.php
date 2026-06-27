@@ -482,7 +482,7 @@ class Reports extends MY_Controller {
                 WHERE p.date_onboarded IS NOT NULL
                   AND p.date_onboarded >= ?
                   AND p.date_onboarded <= ?
-                ORDER BY s.bed_no ASC, p.date_onboarded ASC, p.time_discharged ASC, p.id ASC";
+                ORDER BY p.date_onboarded ASC, s.bed_no ASC, p.time_discharged ASC, p.id ASC";
 
         $query = $this->tenantDb->query($sql, [$from_date, $to_date]);
         return $query->result_array();
