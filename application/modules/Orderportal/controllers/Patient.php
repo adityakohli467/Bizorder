@@ -351,6 +351,20 @@ class Patient extends MY_Controller
         
         log_message('info', "PATIENT ONBOARD SUCCESS: Patient ID={$actionid}, Patient Name=" . ($patient_name ?: 'UNKNOWN') . ", Suite Number={$suite_number}, Onboard Date={$onboard_date}, Discharge Date=" . ($discharge_date ?: 'NONE') . ", Status=" . ($should_be_discharged ? 'DISCHARGED' : 'ACTIVE') . ", Suite Status=" . ($should_be_discharged ? 'VACANT' : 'OCCUPIED') . ", User=" . ($this->session->userdata('username') ?: 'UNKNOWN') . ", User ID=" . ($this->session->userdata('user_id') ?: 'UNKNOWN') . ", IP=" . $this->input->ip_address() . ", Timestamp=" . australia_datetime());
         
+        // ═══════════════════════════════════════════════════════════════════
+        // CLEAR PREVIOUS OCCUPANT'S ORDERS: A brand-new patient is taking this
+        // suite. Orders are stored against the bed (bed_id), so any leftover
+        // non-cancelled orders for this suite belong to the previous occupant
+        // who was discharged. Cancel them so the new patient does NOT inherit
+        // the discharged patient's meals/history.
+        // ═══════════════════════════════════════════════════════════════════
+        if (!$should_be_discharged && !empty($suite_number)) {
+            $clearedCount = $this->clearPreviousOccupantOrders($suite_number, $actionid, $patient_name ?: 'Unknown');
+            if ($clearedCount > 0) {
+                log_message('info', "NEW PATIENT ONBOARD - PREVIOUS OCCUPANT ORDERS CLEARED: {$clearedCount} leftover order item(s) cancelled for suite {$suite_number} before onboarding new patient {$patient_name} (ID={$actionid}). User=" . ($this->session->userdata('username') ?: 'UNKNOWN') . " at " . australia_datetime());
+            }
+        }
+        
         // LOG TO AUDIT TRAIL: Patient Onboarded
         $this->logOnboardingToAuditTrail($actionid, $save_data, $suite_number, $should_be_discharged);
         
@@ -920,6 +934,73 @@ class Patient extends MY_Controller
         $affected = $this->tenantDb->affected_rows();
         
         log_message('info', "SOFT CANCEL: Updated $affected items (IDs: " . implode(',', $item_ids) . ") with is_cancelled=1, reason=$cancel_reason");
+        
+        return $affected;
+    }
+    
+    /**
+     * Clear leftover orders belonging to the previous occupant of a suite.
+     *
+     * Orders are stored against the bed (orders_to_patient_options.bed_id), not the
+     * patient, so when a new patient is onboarded into a suite that a discharged
+     * patient previously occupied, any non-cancelled orders for that bed (today and
+     * future) would otherwise show up under the new patient. This soft-cancels them
+     * so the new patient starts with a clean slate.
+     *
+     * Safety: onboarding a new patient is only allowed when the suite is free
+     * (the duplicate-active-patient check in save_person blocks occupied suites),
+     * so every remaining non-cancelled order here belongs to a prior occupant.
+     *
+     * @param int    $suite_id        Suite / bed id being assigned to the new patient
+     * @param int    $new_patient_id  The newly created patient id (excluded from cancellation)
+     * @param string $new_patient_name New patient name (for logging)
+     * @return int   Number of order items cancelled
+     */
+    private function clearPreviousOccupantOrders($suite_id, $new_patient_id, $new_patient_name) {
+        $this->load->helper('custom');
+        $today = australia_date_only();
+        
+        // Find non-cancelled order items for this bed, for today or future dates,
+        // that do NOT belong to the newly onboarded patient.
+        $this->tenantDb->select('opo.id');
+        $this->tenantDb->from('orders_to_patient_options opo');
+        $this->tenantDb->join('orders o', 'o.order_id = opo.order_id', 'inner');
+        $this->tenantDb->where('opo.bed_id', $suite_id);
+        $this->tenantDb->where('opo.is_cancelled', 0);
+        $this->tenantDb->where('o.date >=', $today);
+        $this->tenantDb->where('o.status !=', 0);
+        $this->tenantDb->group_start();
+        $this->tenantDb->where('opo.patient_id !=', $new_patient_id);
+        $this->tenantDb->or_where('opo.patient_id IS NULL');
+        $this->tenantDb->group_end();
+        
+        $items_query = $this->tenantDb->get();
+        $items_to_cancel = ($items_query) ? $items_query->result_array() : array();
+        
+        if (empty($items_to_cancel)) {
+            return 0;
+        }
+        
+        $item_ids = array_column($items_to_cancel, 'id');
+        
+        // Resolve suite name for the snapshot
+        $suite_details = $this->common_model->fetchRecordsDynamically('suites', ['bed_no'], ['id' => $suite_id]);
+        $suite_name = !empty($suite_details) ? $suite_details[0]['bed_no'] : "Suite $suite_id";
+        
+        $cancel_data = array(
+            'is_cancelled'   => 1,
+            'cancel_reason'  => 'suite_reassigned_new_patient',
+            'cancelled_at'   => australia_datetime(),
+            'cancelled_by'   => $this->session->userdata('user_id'),
+            'suite_name_snapshot' => $suite_name
+        );
+        
+        $this->tenantDb->where_in('id', $item_ids);
+        $this->tenantDb->update('orders_to_patient_options', $cancel_data);
+        
+        $affected = $this->tenantDb->affected_rows();
+        
+        log_message('info', "SUITE REASSIGN CLEAR: Cancelled $affected leftover item(s) (IDs: " . implode(',', $item_ids) . ") for suite $suite_name on onboarding new patient '$new_patient_name' (ID=$new_patient_id)");
         
         return $affected;
     }
