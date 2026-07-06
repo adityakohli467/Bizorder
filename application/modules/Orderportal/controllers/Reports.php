@@ -633,7 +633,6 @@ class Reports extends MY_Controller {
                     FROM people p
                     WHERE p.date_of_discharge IS NOT NULL
                       AND p.date_of_discharge <> '0000-00-00'
-                      AND p.date_of_discharge <> ''
                       AND p.date_of_discharge >= ?
                       AND p.date_of_discharge <= ?
                     GROUP BY p.name, p.date_of_discharge
@@ -657,7 +656,6 @@ class Reports extends MY_Controller {
                       AND (
                             p.date_of_discharge IS NULL
                             OR p.date_of_discharge = '0000-00-00'
-                            OR p.date_of_discharge = ''
                             OR p.date_of_discharge >= ?
                       )
                     GROUP BY p.name, p.date_onboarded
@@ -678,7 +676,6 @@ class Reports extends MY_Controller {
                   AND (
                         p.date_of_discharge IS NULL
                         OR p.date_of_discharge = '0000-00-00'
-                        OR p.date_of_discharge = ''
                         OR p.date_of_discharge >= ?
                   )
                 ORDER BY p.date_onboarded ASC, p.name ASC";
@@ -790,7 +787,7 @@ class Reports extends MY_Controller {
                       SELECT p.name AS n, p.date_of_discharge AS d
                       FROM people p
                       WHERE p.date_of_discharge >= ? AND p.date_of_discharge <= ?
-                        AND p.date_of_discharge IS NOT NULL AND p.date_of_discharge <> '0000-00-00' AND p.date_of_discharge <> ''
+                        AND p.date_of_discharge IS NOT NULL AND p.date_of_discharge <> '0000-00-00'
                       GROUP BY p.name, p.date_of_discharge
                   ) t GROUP BY t.d";
         $coRows = $this->tenantDb->query($coSql, [$from_date, $to_date])->result_array();
