@@ -19,7 +19,7 @@
                 <div class="col-12">
                     <div class="page-title-box d-sm-flex align-items-center justify-content-between">
                         <h4 class="mb-sm-0">Total Number of Patients Ordered Food</h4>
-                        <a href="<?php echo base_url('Orderportal/Reports/adminDashboard?from_date=' . urlencode($from_date) . '&to_date=' . urlencode($to_date)); ?>" class="btn btn-sm btn-light">
+                        <a href="<?php echo base_url('Orderportal/Reports/adminDashboard?from_date=' . urlencode($from_date) . '&to_date=' . urlencode($to_date)); ?>" class="btn btn-sm btn-bo-primary">
                             <i class="ri-arrow-left-line"></i> Back to Dashboard
                         </a>
                     </div>
