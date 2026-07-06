@@ -60,7 +60,7 @@
                                 Patients Ordered Food
                                 <span class="text-muted" style="font-size:13px;">(<?php echo date('d M Y', strtotime($from_date)); ?> &ndash; <?php echo date('d M Y', strtotime($to_date)); ?>)</span>
                             </h5>
-                            <span class="badge bg-primary" style="font-size:13px;">Total: <?php echo (int) $total; ?></span>
+                            <span class="badge bg-primary" style="font-size:13px;color:#fff !important;">Total: <?php echo (int) $total; ?></span>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
