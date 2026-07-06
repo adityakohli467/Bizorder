@@ -141,7 +141,7 @@ $reports = [
                     <div class="stat-card tint-food p-3">
                         <div class="stat-label">Food Orders Today</div>
                         <div class="stat-value val-food"><?php echo ($today_food_orders === '' ? '&ndash;' : (int) $today_food_orders); ?></div>
-                        <p class="stat-sub">No food orders today</p>
+                        <p class="stat-sub">Patients ordered food today</p>
                     </div>
                 </div>
             </div>

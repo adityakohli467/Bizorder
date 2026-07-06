@@ -584,7 +584,7 @@ class Reports extends MY_Controller {
         $data['today_onboarded']   = $this->countOnboardedInRange($today, $today);
         $data['today_discharged']  = $this->countDischargedInRange($today, $today);
         $data['today_active']      = $this->countActiveOnDate($today);
-        $data['today_food_orders'] = ''; // intentionally blank for now
+        $data['today_food_orders'] = $this->countFoodOrderPatientsInRange($today, $today);
 
         // ---- Stats for Selected Range ----
         $rangeDaily = $this->getActivePatientsByDay($from_date, $to_date);
@@ -604,7 +604,7 @@ class Reports extends MY_Controller {
         $data['range_onboarded']   = $this->countOnboardedInRange($from_date, $to_date);
         $data['range_discharged']  = $this->countDischargedInRange($from_date, $to_date);
         $data['range_active']      = $rangeActiveSum;
-        $data['range_food_orders'] = ''; // intentionally blank for now
+        $data['range_food_orders'] = $this->countFoodOrderPatientsInRange($from_date, $to_date);
 
         // ---- Sparkline trend series ----
         // Today cards: last 14 days ending today.
@@ -809,6 +809,23 @@ class Reports extends MY_Controller {
                 ORDER BY o.date ASC";
         $query = $this->tenantDb->query($sql, [$from_date, $to_date]);
         return $query->result_array();
+    }
+
+    /**
+     * Count distinct patients who placed a (non-cancelled) food order within a
+     * date range. A patient who orders on multiple days counts once for the range.
+     */
+    private function countFoodOrderPatientsInRange($from_date, $to_date) {
+        $sql = "SELECT
+                    COUNT(DISTINCT COALESCE(sd.patient_id, NULLIF(opo.patient_id, 0), CONCAT('bed-', opo.bed_id))) AS patient_count
+                FROM orders o
+                INNER JOIN orders_to_patient_options opo ON opo.order_id = o.order_id
+                LEFT JOIN suite_order_details sd ON sd.id = opo.suite_order_detail_id
+                WHERE o.date >= ? AND o.date <= ?
+                  AND o.status != 0
+                  AND (opo.is_cancelled = 0 OR opo.is_cancelled IS NULL)";
+        $row = $this->tenantDb->query($sql, [$from_date, $to_date])->row_array();
+        return (int) ($row['patient_count'] ?? 0);
     }
 
     /**
