@@ -6,8 +6,8 @@
 <style>
     .table td, .table th { color: #212529 !important; }
     .reports-table thead th { background:#5156be; color:#fff; border-color:#5156be; }
-    .btn-bo-primary { background:#5156be; border-color:#5156be; color:#fff; }
-    .btn-bo-primary:hover { background:#4148a8; border-color:#4148a8; color:#fff; }
+    .btn-bo-primary { background:#5156be; border-color:#5156be; color:#fff !important; }
+    .btn-bo-primary:hover, .btn-bo-primary:focus, .btn-bo-primary:active { background:#4148a8; border-color:#4148a8; color:#fff !important; }
     @media print { .btn, #filter-card { display:none !important; } .card { border:none; box-shadow:none; } }
 </style>
 

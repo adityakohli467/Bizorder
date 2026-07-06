@@ -572,7 +572,7 @@ class Reports extends MY_Controller {
             $from_date = date('Y-m-01', strtotime($today)); // first day of current month
         }
         if (empty($to_date)) {
-            $to_date = date('Y-m-t', strtotime($today));    // last day of current month
+            $to_date = $today;                               // default up to today (not future)
         }
 
         // From Date cannot be later than To Date - swap if reversed.
@@ -691,8 +691,11 @@ class Reports extends MY_Controller {
     private function getActivePatientsByDay($from_date, $to_date) {
         $people = $this->fetchPeopleForActiveCalc($from_date, $to_date);
 
+        // Never project active patients into the future - cap at today.
+        $endTs = min(strtotime($to_date), strtotime(australia_date_only()));
+
         $result = [];
-        for ($ts = strtotime($from_date); $ts <= strtotime($to_date); $ts += 86400) {
+        for ($ts = strtotime($from_date); $ts <= $endTs; $ts += 86400) {
             $day = date('Y-m-d', $ts);
 
             $activeNames = [];
@@ -794,8 +797,11 @@ class Reports extends MY_Controller {
         $coMap = [];
         foreach ($coRows as $rw) { $coMap[$rw['d']] = (int) $rw['cnt']; }
 
+        // Never list future days - cap at today.
+        $endTs = min(strtotime($to_date), strtotime(australia_date_only()));
+
         $result = [];
-        for ($ts = strtotime($from_date); $ts <= strtotime($to_date); $ts += 86400) {
+        for ($ts = strtotime($from_date); $ts <= $endTs; $ts += 86400) {
             $day = date('Y-m-d', $ts);
             $result[] = [
                 'date'       => $day,
@@ -923,7 +929,7 @@ class Reports extends MY_Controller {
     private function resolveReportRange() {
         $today     = australia_date_only();
         $from_date = $this->input->post('from_date') ?: $this->input->get('from_date') ?: date('Y-m-01', strtotime($today));
-        $to_date   = $this->input->post('to_date')   ?: $this->input->get('to_date')   ?: date('Y-m-t', strtotime($today));
+        $to_date   = $this->input->post('to_date')   ?: $this->input->get('to_date')   ?: $today;
         if (strtotime($from_date) > strtotime($to_date)) {
             $tmp = $from_date; $from_date = $to_date; $to_date = $tmp;
         }
@@ -1007,8 +1013,9 @@ class Reports extends MY_Controller {
      * Generic .xlsx output helper (PhpSpreadsheet).
      * $headers = array of column titles; $rows = array of row arrays;
      * $summaryRows = optional list of [label, value] rows appended after a blank line.
+     * $wrapCols = optional list of [colIndex (1-based), width] whose cells wrap text.
      */
-    private function outputXlsx($filename, $title, $from_date, $to_date, $headers, $rows, $summaryRows = []) {
+    private function outputXlsx($filename, $title, $from_date, $to_date, $headers, $rows, $summaryRows = [], $wrapCols = []) {
         $meta = $this->getReportMeta();
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -1050,6 +1057,7 @@ class Reports extends MY_Controller {
         $r++;
 
         // Data rows
+        $firstDataRow = $r;
         foreach ($rows as $dataRow) {
             $col = 1;
             foreach ($dataRow as $val) {
@@ -1062,6 +1070,7 @@ class Reports extends MY_Controller {
             }
             $r++;
         }
+        $lastDataRow = $r - 1;
 
         // Summary rows
         if (!empty($summaryRows)) {
@@ -1077,8 +1086,26 @@ class Reports extends MY_Controller {
             }
         }
 
+        // Columns that should wrap use a fixed width; the rest auto-size.
+        $wrapMap = [];
+        foreach ($wrapCols as $wc) {
+            $idx = (int) $wc[0];
+            $wrapMap[$idx] = isset($wc[1]) ? (float) $wc[1] : 60;
+        }
+
         for ($c = 1; $c <= $colCount; $c++) {
-            $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c))->setAutoSize(true);
+            $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+            if (isset($wrapMap[$c])) {
+                $sheet->getColumnDimension($letter)->setWidth($wrapMap[$c]);
+                if (!empty($rows)) {
+                    $range = $letter . $firstDataRow . ':' . $letter . $lastDataRow;
+                    $sheet->getStyle($range)->getAlignment()->setWrapText(true);
+                    $sheet->getStyle($range)->getAlignment()
+                          ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+                }
+            } else {
+                $sheet->getColumnDimension($letter)->setAutoSize(true);
+            }
         }
 
         // Prevent any prior output from corrupting the binary stream.
@@ -1116,7 +1143,8 @@ class Reports extends MY_Controller {
         $this->outputXlsx(
             'active_patients_report_' . date('Y-m-d_His') . '.xlsx',
             'Total Number of Active Patients',
-            $from_date, $to_date, $headers, $rows, $summary
+            $from_date, $to_date, $headers, $rows, $summary,
+            [[3, 70]] // wrap the "Patient Names Active" column
         );
     }
 

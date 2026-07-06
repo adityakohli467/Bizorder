@@ -40,26 +40,35 @@ $reports = [
         --bo-blue:    #299cdb;
     }
     .stat-card {
-        border: 1px solid #eef0f7;
+        border: 1px solid #e3e6f0;
+        border-left-width: 5px;
         border-radius: 10px;
         background: #fff;
+        box-shadow: 0 4px 14px rgba(81, 86, 190, 0.12);
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 22px rgba(81, 86, 190, 0.20);
     }
     .stat-card .stat-label {
         font-size: 13px;
         font-weight: 600;
         color: #495057;
         margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: .3px;
     }
     .stat-card .stat-value {
-        font-size: 34px;
-        font-weight: 700;
+        font-size: 36px;
+        font-weight: 800;
         line-height: 1;
     }
-    .stat-card.tint-onboard  { background: #eef0fb; }
-    .stat-card.tint-discharge{ background: #fdecea; }
-    .stat-card.tint-active   { background: #eaf3fb; }
-    .stat-card.tint-food     { background: #fdf3e2; }
-    .stat-card.tint-range    { background: #f5f6fc; }
+    .stat-card.tint-onboard  { background: #eef0fb; border-left-color: var(--bo-primary); }
+    .stat-card.tint-discharge{ background: #fdecea; border-left-color: var(--bo-red); }
+    .stat-card.tint-active   { background: #eaf3fb; border-left-color: var(--bo-blue); }
+    .stat-card.tint-food     { background: #fdf3e2; border-left-color: var(--bo-amber); }
+    .stat-card.tint-range    { background: #f0f1fb; border-left-color: var(--bo-primary); }
 
     .val-onboard  { color: var(--bo-primary); }
     .val-discharge{ color: var(--bo-red); }
@@ -79,9 +88,11 @@ $reports = [
     .btn-bo-primary {
         background: var(--bo-primary);
         border-color: var(--bo-primary);
-        color: #fff;
+        color: #fff !important;
     }
-    .btn-bo-primary:hover { background: #4148a8; border-color: #4148a8; color: #fff; }
+    .btn-bo-primary:hover,
+    .btn-bo-primary:focus,
+    .btn-bo-primary:active { background: #4148a8; border-color: #4148a8; color: #fff !important; }
 </style>
 
 <div class="main-content">
