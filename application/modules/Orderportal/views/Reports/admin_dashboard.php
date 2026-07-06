@@ -40,35 +40,51 @@ $reports = [
         --bo-blue:    #299cdb;
     }
     .stat-card {
-        border: 1px solid #e3e6f0;
-        border-left-width: 5px;
-        border-radius: 10px;
+        border: 1px solid #e9eaf2;
+        border-radius: 12px;
         background: #fff;
-        box-shadow: 0 4px 14px rgba(81, 86, 190, 0.12);
+        box-shadow: 0 2px 10px rgba(56, 65, 74, 0.06);
         transition: transform .15s ease, box-shadow .15s ease;
+        height: 100%;
     }
     .stat-card:hover {
         transform: translateY(-3px);
-        box-shadow: 0 8px 22px rgba(81, 86, 190, 0.20);
+        box-shadow: 0 8px 22px rgba(56, 65, 74, 0.12);
     }
     .stat-card .stat-label {
         font-size: 13px;
         font-weight: 600;
-        color: #495057;
-        margin-bottom: 6px;
+        color: #878a99;
+        margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: .3px;
     }
     .stat-card .stat-value {
-        font-size: 36px;
-        font-weight: 800;
+        font-size: 30px;
+        font-weight: 700;
         line-height: 1;
+        margin-bottom: 6px;
     }
-    .stat-card.tint-onboard  { background: #eef0fb; border-left-color: var(--bo-primary); }
-    .stat-card.tint-discharge{ background: #fdecea; border-left-color: var(--bo-red); }
-    .stat-card.tint-active   { background: #eaf3fb; border-left-color: var(--bo-blue); }
-    .stat-card.tint-food     { background: #fdf3e2; border-left-color: var(--bo-amber); }
-    .stat-card.tint-range    { background: #f0f1fb; border-left-color: var(--bo-primary); }
+    .stat-card .stat-sub {
+        font-size: 12.5px;
+        color: #878a99;
+        margin-bottom: 0;
+    }
+    /* Body: number/subtitle stacked, sparkline full width below (desktop) */
+    .stat-main { display: flex; flex-direction: column; }
+    .stat-spark { width: 100%; min-height: 46px; margin-top: 10px; }
+    .stat-text { min-width: 0; }
+
+    /* Mobile: label + number on the left, sparkline on the right */
+    @media (max-width: 767.98px) {
+        .stat-main { flex-direction: row; align-items: center; justify-content: space-between; }
+        .stat-spark { width: 120px; margin-top: 0; margin-left: 12px; flex: 0 0 auto; }
+    }
+
+    .stat-card.tint-onboard   { background: #f5f6fe; }
+    .stat-card.tint-discharge { background: #fef4f2; }
+    .stat-card.tint-active    { background: #f1f8fd; }
+    .stat-card.tint-food      { background: #fefaf1; }
 
     .val-onboard  { color: var(--bo-primary); }
     .val-discharge{ color: var(--bo-red); }
@@ -111,28 +127,52 @@ $reports = [
             <!-- Quick Stats (Today) -->
             <h5 class="section-title">Quick Stats (Today)</h5>
             <div class="row g-3 mb-2">
-                <div class="col-md-3 col-sm-6">
+                <div class="col-lg-3 col-sm-6">
                     <div class="stat-card tint-onboard p-3">
                         <div class="stat-label">Onboarded Today</div>
-                        <div class="stat-value val-onboard"><?php echo (int) $today_onboarded; ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-onboard"><?php echo (int) $today_onboarded; ?></div>
+                                <p class="stat-sub">New patients onboarded</p>
+                            </div>
+                            <div class="stat-spark" id="spark-t-onboard"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
+                <div class="col-lg-3 col-sm-6">
                     <div class="stat-card tint-discharge p-3">
                         <div class="stat-label">Discharged Today</div>
-                        <div class="stat-value val-discharge"><?php echo (int) $today_discharged; ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-discharge"><?php echo (int) $today_discharged; ?></div>
+                                <p class="stat-sub">Patients discharged</p>
+                            </div>
+                            <div class="stat-spark" id="spark-t-discharge"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
+                <div class="col-lg-3 col-sm-6">
                     <div class="stat-card tint-active p-3">
                         <div class="stat-label">Active Patients Today</div>
-                        <div class="stat-value val-active"><?php echo (int) $today_active; ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-active"><?php echo (int) $today_active; ?></div>
+                                <p class="stat-sub">Currently active patients</p>
+                            </div>
+                            <div class="stat-spark" id="spark-t-active"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
+                <div class="col-lg-3 col-sm-6">
                     <div class="stat-card tint-food p-3">
                         <div class="stat-label">Food Orders Today</div>
-                        <div class="stat-value val-food"><?php echo ($today_food_orders === '' ? '&ndash;' : (int) $today_food_orders); ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-food"><?php echo ($today_food_orders === '' ? '&ndash;' : (int) $today_food_orders); ?></div>
+                                <p class="stat-sub">No food orders today</p>
+                            </div>
+                            <div class="stat-spark" id="spark-t-food"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -174,28 +214,52 @@ $reports = [
                 Stats for <?php echo date('d/m/Y', strtotime($from_date)); ?> - <?php echo date('d/m/Y', strtotime($to_date)); ?>
             </h5>
             <div class="row g-3 mb-2">
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card tint-range p-3">
+                <div class="col-lg-3 col-sm-6">
+                    <div class="stat-card tint-onboard p-3">
                         <div class="stat-label">Onboarded</div>
-                        <div class="stat-value val-range"><?php echo (int) $range_onboarded; ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-onboard"><?php echo (int) $range_onboarded; ?></div>
+                                <p class="stat-sub">New patients onboarded</p>
+                            </div>
+                            <div class="stat-spark" id="spark-r-onboard"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card tint-range p-3">
+                <div class="col-lg-3 col-sm-6">
+                    <div class="stat-card tint-discharge p-3">
                         <div class="stat-label">Discharged</div>
-                        <div class="stat-value val-range"><?php echo (int) $range_discharged; ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-discharge"><?php echo (int) $range_discharged; ?></div>
+                                <p class="stat-sub">Patients discharged</p>
+                            </div>
+                            <div class="stat-spark" id="spark-r-discharge"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card tint-range p-3">
+                <div class="col-lg-3 col-sm-6">
+                    <div class="stat-card tint-active p-3">
                         <div class="stat-label">Active Patients</div>
-                        <div class="stat-value val-range"><?php echo (int) $range_active; ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-active"><?php echo (int) $range_active; ?></div>
+                                <p class="stat-sub">Active patient-days</p>
+                            </div>
+                            <div class="stat-spark" id="spark-r-active"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="stat-card tint-range p-3">
+                <div class="col-lg-3 col-sm-6">
+                    <div class="stat-card tint-food p-3">
                         <div class="stat-label">Food Orders</div>
-                        <div class="stat-value val-range"><?php echo ($range_food_orders === '' ? '&ndash;' : (int) $range_food_orders); ?></div>
+                        <div class="stat-main">
+                            <div class="stat-text">
+                                <div class="stat-value val-food"><?php echo ($range_food_orders === '' ? '&ndash;' : (int) $range_food_orders); ?></div>
+                                <p class="stat-sub">Patients ordered food</p>
+                            </div>
+                            <div class="stat-spark" id="spark-r-food"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -248,4 +312,52 @@ $reports = [
             alert('From Date cannot be later than To Date.');
         }
     });
+</script>
+
+<script src="<?php echo base_url('theme-assets/libs/apexcharts/apexcharts.min.js'); ?>"></script>
+<script>
+    (function () {
+        var spark = {
+            todayOnboard:   <?php echo json_encode(array_values($spark_today['onboard'])); ?>,
+            todayDischarge: <?php echo json_encode(array_values($spark_today['discharge'])); ?>,
+            todayActive:    <?php echo json_encode(array_values($spark_today['active'])); ?>,
+            todayFood:      <?php echo json_encode(array_values($spark_today['food'])); ?>,
+            rangeOnboard:   <?php echo json_encode(array_values($spark_range['onboard'])); ?>,
+            rangeDischarge: <?php echo json_encode(array_values($spark_range['discharge'])); ?>,
+            rangeActive:    <?php echo json_encode(array_values($spark_range['active'])); ?>,
+            rangeFood:      <?php echo json_encode(array_values($spark_range['food'])); ?>
+        };
+
+        function renderSpark(id, data, color) {
+            var el = document.querySelector(id);
+            if (!el || typeof ApexCharts === 'undefined') { return; }
+            if (!data || !data.length) { data = [0, 0]; }
+            new ApexCharts(el, {
+                chart: { type: 'area', height: 46, sparkline: { enabled: true }, animations: { enabled: false } },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 90] } },
+                series: [{ name: '', data: data }],
+                colors: [color],
+                tooltip: { fixed: { enabled: false }, x: { show: false }, marker: { show: false } }
+            }).render();
+        }
+
+        function drawAll() {
+            var primary = '#5156be', red = '#f06548', blue = '#299cdb', amber = '#f7b84b';
+            renderSpark('#spark-t-onboard',   spark.todayOnboard,   primary);
+            renderSpark('#spark-t-discharge', spark.todayDischarge, red);
+            renderSpark('#spark-t-active',    spark.todayActive,    blue);
+            renderSpark('#spark-t-food',      spark.todayFood,      amber);
+            renderSpark('#spark-r-onboard',   spark.rangeOnboard,   primary);
+            renderSpark('#spark-r-discharge', spark.rangeDischarge, red);
+            renderSpark('#spark-r-active',    spark.rangeActive,    blue);
+            renderSpark('#spark-r-food',      spark.rangeFood,      amber);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', drawAll);
+        } else {
+            drawAll();
+        }
+    })();
 </script>

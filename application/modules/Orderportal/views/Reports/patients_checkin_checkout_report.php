@@ -21,7 +21,7 @@
                 <div class="col-12">
                     <div class="page-title-box d-sm-flex align-items-center justify-content-between">
                         <h4 class="mb-sm-0">Patients Report with Check-ins &amp; Check-outs</h4>
-                        <a href="<?php echo base_url('Orderportal/Reports/adminDashboard?from_date=' . urlencode($from_date) . '&to_date=' . urlencode($to_date)); ?>" class="btn btn-sm btn-light">
+                        <a href="<?php echo base_url('Orderportal/Reports/adminDashboard?from_date=' . urlencode($from_date) . '&to_date=' . urlencode($to_date)); ?>" class="btn btn-sm btn-bo-primary">
                             <i class="ri-arrow-left-line"></i> Back to Dashboard
                         </a>
                     </div>
@@ -62,7 +62,7 @@
                                 Patients
                                 <span class="text-muted" style="font-size:13px;">(<?php echo date('d M Y', strtotime($from_date)); ?> &ndash; <?php echo date('d M Y', strtotime($to_date)); ?>)</span>
                             </h5>
-                            <span class="badge bg-primary" style="font-size:13px;">Total Patients: <?php echo count($records); ?></span>
+                            <span class="badge bg-primary" style="font-size:13px;color:#fff !important;">Total Patients: <?php echo count($records); ?></span>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">

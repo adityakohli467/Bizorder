@@ -587,10 +587,50 @@ class Reports extends MY_Controller {
         $data['today_food_orders'] = ''; // intentionally blank for now
 
         // ---- Stats for Selected Range ----
+        $rangeDaily = $this->getActivePatientsByDay($from_date, $to_date);
+        $rangeActiveSum = 0;
+        $rangeCats = [];
+        $rangeOnboardSpark = [];
+        $rangeDischargeSpark = [];
+        $rangeActiveSpark = [];
+        foreach ($rangeDaily as $d) {
+            $rangeCats[]           = $d['date'];
+            $rangeOnboardSpark[]   = (int) $d['onboarded'];
+            $rangeDischargeSpark[] = (int) $d['discharged'];
+            $rangeActiveSpark[]    = (int) $d['active'];
+            $rangeActiveSum       += (int) $d['active'];
+        }
+
         $data['range_onboarded']   = $this->countOnboardedInRange($from_date, $to_date);
         $data['range_discharged']  = $this->countDischargedInRange($from_date, $to_date);
-        $data['range_active']      = $this->countActivePatientDays($from_date, $to_date);
+        $data['range_active']      = $rangeActiveSum;
         $data['range_food_orders'] = ''; // intentionally blank for now
+
+        // ---- Sparkline trend series ----
+        // Today cards: last 14 days ending today.
+        $sparkFrom  = date('Y-m-d', strtotime($today . ' -13 days'));
+        $todayDaily = $this->getActivePatientsByDay($sparkFrom, $today);
+        $spCats = []; $spOnboard = []; $spDischarge = []; $spActive = [];
+        foreach ($todayDaily as $d) {
+            $spCats[]      = $d['date'];
+            $spOnboard[]   = (int) $d['onboarded'];
+            $spDischarge[] = (int) $d['discharged'];
+            $spActive[]    = (int) $d['active'];
+        }
+        $spFood = $this->buildFoodSpark($spCats, $sparkFrom, $today);
+
+        $data['spark_today'] = [
+            'onboard'   => $spOnboard,
+            'discharge' => $spDischarge,
+            'active'    => $spActive,
+            'food'      => $spFood,
+        ];
+        $data['spark_range'] = [
+            'onboard'   => $rangeOnboardSpark,
+            'discharge' => $rangeDischargeSpark,
+            'active'    => $rangeActiveSpark,
+            'food'      => $this->buildFoodSpark($rangeCats, $from_date, $to_date),
+        ];
 
         $data['from_date']  = $from_date;
         $data['to_date']    = $to_date;
@@ -772,6 +812,21 @@ class Reports extends MY_Controller {
     }
 
     /**
+     * Build a per-day food-order series aligned to the given ordered date list.
+     */
+    private function buildFoodSpark($cats, $from_date, $to_date) {
+        $map = [];
+        foreach ($this->getFoodOrdersByDay($from_date, $to_date) as $fr) {
+            $map[$fr['order_date']] = (int) $fr['patient_count'];
+        }
+        $series = [];
+        foreach ($cats as $day) {
+            $series[] = $map[$day] ?? 0;
+        }
+        return $series;
+    }
+
+    /**
      * Per-day check-in and check-out counts (de-duped by name + date).
      */
     private function getCheckinCheckoutByDay($from_date, $to_date) {
@@ -891,18 +946,12 @@ class Reports extends MY_Controller {
     }
 
     /**
-     * Format a duration (seconds) into a compact "Xd Yh Zm" string.
+     * Format a duration (seconds) into a whole number of days.
      */
     private function formatDuration($seconds) {
         $seconds = max(0, (int) $seconds);
-        $days  = floor($seconds / 86400);
-        $hours = floor(($seconds % 86400) / 3600);
-        $mins  = floor(($seconds % 3600) / 60);
-        $parts = [];
-        if ($days > 0)  { $parts[] = $days . 'd'; }
-        if ($hours > 0) { $parts[] = $hours . 'h'; }
-        if ($mins > 0 || empty($parts)) { $parts[] = $mins . 'm'; }
-        return implode(' ', $parts);
+        $days = (int) round($seconds / 86400);
+        return $days . ' ' . ($days === 1 ? 'day' : 'days');
     }
 
     /**
