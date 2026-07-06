@@ -388,8 +388,8 @@ class Hospitalconfig extends MY_Controller
                 // Update patient status to discharged (2) WITH time_discharged
                 $patient_update = array(
                     'status' => 2, 
-                    'date_modified' => date('Y-m-d H:i:s'),
-                    'time_discharged' => date('Y-m-d H:i:s')
+                    'date_modified' => australia_datetime(),
+                    'time_discharged' => australia_datetime()
                 );
                 $patient_result = $this->common_model->commonRecordUpdate('people', 'id', $person_id, $patient_update);
 
@@ -742,7 +742,7 @@ class Hospitalconfig extends MY_Controller
                     // Update patient status to discharged WITH time_discharged
                     $patient_update = array(
                         'status' => 2, 
-                        'date_modified' => date('Y-m-d H:i:s')
+                        'date_modified' => australia_datetime()
                     );
                     
                     // Set time_discharged if not already set

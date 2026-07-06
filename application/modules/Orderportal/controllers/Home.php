@@ -160,9 +160,9 @@ class Home extends MY_Controller {
         }
         
         if($groupId == 1){
-// 			$this->load->view('Dashboard/dashboardAdmin',$data);
-          // dashboardd for admin and chef are same
-          $this->dashboardChef();
+          // Admin role lands on the consolidated Order Reports dashboard
+          redirect('Orderportal/Reports/adminDashboard');
+          return;
 		}else if($groupId == 2){
 		    $this->dashboardChef();
 		}else if($groupId == 3){
@@ -1905,7 +1905,7 @@ class Home extends MY_Controller {
                     // Update patient status to DISCHARGED (status=2, NOT 0)
                     $update_data = array(
                         'status' => 2,
-                        'date_modified' => date('Y-m-d H:i:s')
+                        'date_modified' => australia_datetime()
                     );
                     
                     // Set time_discharged if not already set

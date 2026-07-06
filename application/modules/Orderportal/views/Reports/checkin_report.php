@@ -133,7 +133,18 @@
                                                     }
 
                                                     if (!empty($row['time_discharged']) && $row['time_discharged'] != '0000-00-00 00:00:00') {
-                                                        $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
+                                                        // Guard against legacy bad data (e.g. check-out recorded in a
+                                                        // different timezone) where the stored check-out time is earlier
+                                                        // than the check-in. In that case the time is unreliable, so fall
+                                                        // back to the discharge date only.
+                                                        if (!empty($row['time_onboarded'])
+                                                            && strtotime($row['time_discharged']) < strtotime($row['time_onboarded'])) {
+                                                            $checkout = $has_checkout
+                                                                ? date('d M Y', strtotime($row['date_of_discharge']))
+                                                                : date('d M Y', strtotime($row['time_discharged']));
+                                                        } else {
+                                                            $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
+                                                        }
                                                     } elseif ($has_checkout) {
                                                         $checkout = date('d M Y', strtotime($row['date_of_discharge']));
                                                     } else {

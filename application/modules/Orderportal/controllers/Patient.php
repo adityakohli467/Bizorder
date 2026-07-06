@@ -288,7 +288,18 @@ class Patient extends MY_Controller
         // Mark suite as vacant and patient as discharged
         $bedData['is_vaccant'] = 1;
         $save_data['status'] = 2; // Set patient status to discharged
-        $save_data['time_discharged'] = australia_datetime(); // Record exact time of discharge
+        // Record the actual check-out time:
+        //  - If the discharge date is TODAY, the patient is being checked out
+        //    right now, so use the exact current Australia time.
+        //  - If the discharge date is in the PAST (back-dated onboarding), use
+        //    the end of that discharge day instead of "now", otherwise the
+        //    recorded check-out time would be days after the real discharge
+        //    (and could even appear after a later check-in).
+        if ($discharge_timestamp == $today_timestamp) {
+            $save_data['time_discharged'] = australia_datetime();
+        } else {
+            $save_data['time_discharged'] = date('Y-m-d', $discharge_timestamp) . ' 23:59:00';
+        }
     } else {
         // Mark suite as occupied (only if patient is active)
         $bedData['is_vaccant'] = 0;

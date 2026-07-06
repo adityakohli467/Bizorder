@@ -523,7 +523,16 @@ class Reports extends MY_Controller {
 
             $checkout = '';
             if (!empty($row['time_discharged']) && $row['time_discharged'] != '0000-00-00 00:00:00') {
-                $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
+                // Guard against legacy bad data where the stored check-out time is
+                // earlier than the check-in (e.g. recorded in a different timezone).
+                if (!empty($row['time_onboarded'])
+                    && strtotime($row['time_discharged']) < strtotime($row['time_onboarded'])) {
+                    $checkout = (!empty($row['date_of_discharge']) && $row['date_of_discharge'] != '0000-00-00')
+                        ? date('d M Y', strtotime($row['date_of_discharge']))
+                        : date('d M Y', strtotime($row['time_discharged']));
+                } else {
+                    $checkout = date('d M Y h:i A', strtotime($row['time_discharged']));
+                }
             } elseif (!empty($row['date_of_discharge']) && $row['date_of_discharge'] != '0000-00-00') {
                 $checkout = date('d M Y', strtotime($row['date_of_discharge']));
             } else {
@@ -541,6 +550,657 @@ class Reports extends MY_Controller {
 
         fclose($output);
         exit;
+    }
+
+    // ============================================================
+    //  ADMIN REPORTS DASHBOARD
+    //  Consolidated landing page for admin users with quick stats,
+    //  a date-range filter, range stats and links to all reports.
+    // ============================================================
+
+    /**
+     * Admin Reports Dashboard (landing page for admin role).
+     */
+    public function adminDashboard() {
+        $today = australia_date_only();
+
+        // Date range filter (default = current month)
+        $from_date = $this->input->post('from_date') ?: $this->input->get('from_date');
+        $to_date   = $this->input->post('to_date')   ?: $this->input->get('to_date');
+
+        if (empty($from_date)) {
+            $from_date = date('Y-m-01', strtotime($today)); // first day of current month
+        }
+        if (empty($to_date)) {
+            $to_date = date('Y-m-t', strtotime($today));    // last day of current month
+        }
+
+        // From Date cannot be later than To Date - swap if reversed.
+        if (strtotime($from_date) > strtotime($to_date)) {
+            $tmp = $from_date; $from_date = $to_date; $to_date = $tmp;
+        }
+
+        // ---- Quick Stats (Today) ----
+        $data['today_onboarded']   = $this->countOnboardedInRange($today, $today);
+        $data['today_discharged']  = $this->countDischargedInRange($today, $today);
+        $data['today_active']      = $this->countActiveOnDate($today);
+        $data['today_food_orders'] = ''; // intentionally blank for now
+
+        // ---- Stats for Selected Range ----
+        $data['range_onboarded']   = $this->countOnboardedInRange($from_date, $to_date);
+        $data['range_discharged']  = $this->countDischargedInRange($from_date, $to_date);
+        $data['range_active']      = $this->countActivePatientDays($from_date, $to_date);
+        $data['range_food_orders'] = ''; // intentionally blank for now
+
+        $data['from_date']  = $from_date;
+        $data['to_date']    = $to_date;
+        $data['today']      = $today;
+        $data['page_title'] = 'Order Reports';
+        $data['pagefor']    = 'reports';
+
+        $this->load->view('general/header', $data);
+        $this->load->view('Orderportal/Reports/admin_dashboard', $data);
+        $this->load->view('general/footer', $data);
+    }
+
+    // ---------------- Stat helper queries ----------------
+
+    /**
+     * Count distinct patients onboarded within a date range.
+     * De-dupes by (name + date_onboarded).
+     */
+    private function countOnboardedInRange($from_date, $to_date) {
+        $sql = "SELECT COUNT(*) AS cnt FROM (
+                    SELECT p.name, p.date_onboarded
+                    FROM people p
+                    WHERE p.date_onboarded IS NOT NULL
+                      AND p.date_onboarded <> '0000-00-00'
+                      AND p.date_onboarded >= ?
+                      AND p.date_onboarded <= ?
+                    GROUP BY p.name, p.date_onboarded
+                ) t";
+        $row = $this->tenantDb->query($sql, [$from_date, $to_date])->row_array();
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Count distinct patients discharged within a date range.
+     * De-dupes by (name + date_of_discharge).
+     */
+    private function countDischargedInRange($from_date, $to_date) {
+        $sql = "SELECT COUNT(*) AS cnt FROM (
+                    SELECT p.name, p.date_of_discharge
+                    FROM people p
+                    WHERE p.date_of_discharge IS NOT NULL
+                      AND p.date_of_discharge <> '0000-00-00'
+                      AND p.date_of_discharge <> ''
+                      AND p.date_of_discharge >= ?
+                      AND p.date_of_discharge <= ?
+                    GROUP BY p.name, p.date_of_discharge
+                ) t";
+        $row = $this->tenantDb->query($sql, [$from_date, $to_date])->row_array();
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Count distinct patients active on a specific date.
+     * Active = onboarded on/before date AND (not discharged OR discharged on/after date).
+     * De-dupes by (name + date_onboarded).
+     */
+    private function countActiveOnDate($date) {
+        $sql = "SELECT COUNT(*) AS cnt FROM (
+                    SELECT p.name, p.date_onboarded
+                    FROM people p
+                    WHERE p.date_onboarded IS NOT NULL
+                      AND p.date_onboarded <> '0000-00-00'
+                      AND p.date_onboarded <= ?
+                      AND (
+                            p.date_of_discharge IS NULL
+                            OR p.date_of_discharge = '0000-00-00'
+                            OR p.date_of_discharge = ''
+                            OR p.date_of_discharge >= ?
+                      )
+                    GROUP BY p.name, p.date_onboarded
+                ) t";
+        $row = $this->tenantDb->query($sql, [$date, $date])->row_array();
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    /**
+     * Fetch people that could be active on any day within the range.
+     */
+    private function fetchPeopleForActiveCalc($from_date, $to_date) {
+        $sql = "SELECT p.id, p.name, p.date_onboarded, p.date_of_discharge
+                FROM people p
+                WHERE p.date_onboarded IS NOT NULL
+                  AND p.date_onboarded <> '0000-00-00'
+                  AND p.date_onboarded <= ?
+                  AND (
+                        p.date_of_discharge IS NULL
+                        OR p.date_of_discharge = '0000-00-00'
+                        OR p.date_of_discharge = ''
+                        OR p.date_of_discharge >= ?
+                  )
+                ORDER BY p.date_onboarded ASC, p.name ASC";
+        $query = $this->tenantDb->query($sql, [$to_date, $from_date]);
+        return $query->result_array();
+    }
+
+    /**
+     * Build a per-day active patients breakdown for the range.
+     * Each entry: date, active (count), names[], onboarded, discharged.
+     * De-dupes by (name + date_onboarded).
+     */
+    private function getActivePatientsByDay($from_date, $to_date) {
+        $people = $this->fetchPeopleForActiveCalc($from_date, $to_date);
+
+        $result = [];
+        for ($ts = strtotime($from_date); $ts <= strtotime($to_date); $ts += 86400) {
+            $day = date('Y-m-d', $ts);
+
+            $activeNames = [];
+            $seenActive  = [];
+            $onboarded   = 0; $seenOn  = [];
+            $discharged  = 0; $seenDis = [];
+
+            foreach ($people as $p) {
+                $on     = $p['date_onboarded'];
+                $dis    = $p['date_of_discharge'];
+                $hasDis = !empty($dis) && $dis !== '0000-00-00';
+                $key    = $p['name'] . '|' . $on;
+
+                if ($on <= $day && (!$hasDis || $dis >= $day)) {
+                    if (!isset($seenActive[$key])) {
+                        $seenActive[$key] = true;
+                        $activeNames[] = $p['name'];
+                    }
+                }
+                if ($on === $day && !isset($seenOn[$key])) {
+                    $seenOn[$key] = true;
+                    $onboarded++;
+                }
+                if ($hasDis && $dis === $day) {
+                    $disKey = $p['name'] . '|' . $dis;
+                    if (!isset($seenDis[$disKey])) {
+                        $seenDis[$disKey] = true;
+                        $discharged++;
+                    }
+                }
+            }
+
+            $result[] = [
+                'date'       => $day,
+                'active'     => count($activeNames),
+                'names'      => $activeNames,
+                'onboarded'  => $onboarded,
+                'discharged' => $discharged,
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Sum of daily active patient counts across the range (active patient-days).
+     */
+    private function countActivePatientDays($from_date, $to_date) {
+        $total = 0;
+        foreach ($this->getActivePatientsByDay($from_date, $to_date) as $d) {
+            $total += (int) $d['active'];
+        }
+        return $total;
+    }
+
+    /**
+     * Per-day count of distinct patients who placed a (non-cancelled) food order.
+     * Counts by patient so two patients in the same suite on the same day
+     * (one discharged, one checked in) yield two counts.
+     */
+    private function getFoodOrdersByDay($from_date, $to_date) {
+        $sql = "SELECT
+                    o.date AS order_date,
+                    COUNT(DISTINCT COALESCE(sd.patient_id, NULLIF(opo.patient_id, 0), CONCAT('bed-', opo.bed_id))) AS patient_count
+                FROM orders o
+                INNER JOIN orders_to_patient_options opo ON opo.order_id = o.order_id
+                LEFT JOIN suite_order_details sd ON sd.id = opo.suite_order_detail_id
+                WHERE o.date >= ? AND o.date <= ?
+                  AND o.status != 0
+                  AND (opo.is_cancelled = 0 OR opo.is_cancelled IS NULL)
+                GROUP BY o.date
+                ORDER BY o.date ASC";
+        $query = $this->tenantDb->query($sql, [$from_date, $to_date]);
+        return $query->result_array();
+    }
+
+    /**
+     * Per-day check-in and check-out counts (de-duped by name + date).
+     */
+    private function getCheckinCheckoutByDay($from_date, $to_date) {
+        $ciSql = "SELECT t.d AS d, COUNT(*) AS cnt FROM (
+                      SELECT p.name AS n, p.date_onboarded AS d
+                      FROM people p
+                      WHERE p.date_onboarded >= ? AND p.date_onboarded <= ?
+                        AND p.date_onboarded IS NOT NULL AND p.date_onboarded <> '0000-00-00'
+                      GROUP BY p.name, p.date_onboarded
+                  ) t GROUP BY t.d";
+        $ciRows = $this->tenantDb->query($ciSql, [$from_date, $to_date])->result_array();
+        $ciMap = [];
+        foreach ($ciRows as $rw) { $ciMap[$rw['d']] = (int) $rw['cnt']; }
+
+        $coSql = "SELECT t.d AS d, COUNT(*) AS cnt FROM (
+                      SELECT p.name AS n, p.date_of_discharge AS d
+                      FROM people p
+                      WHERE p.date_of_discharge >= ? AND p.date_of_discharge <= ?
+                        AND p.date_of_discharge IS NOT NULL AND p.date_of_discharge <> '0000-00-00' AND p.date_of_discharge <> ''
+                      GROUP BY p.name, p.date_of_discharge
+                  ) t GROUP BY t.d";
+        $coRows = $this->tenantDb->query($coSql, [$from_date, $to_date])->result_array();
+        $coMap = [];
+        foreach ($coRows as $rw) { $coMap[$rw['d']] = (int) $rw['cnt']; }
+
+        $result = [];
+        for ($ts = strtotime($from_date); $ts <= strtotime($to_date); $ts += 86400) {
+            $day = date('Y-m-d', $ts);
+            $result[] = [
+                'date'       => $day,
+                'check_ins'  => isset($ciMap[$day]) ? $ciMap[$day] : 0,
+                'check_outs' => isset($coMap[$day]) ? $coMap[$day] : 0,
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Detailed patient list with check-in / check-out details for the range.
+     */
+    private function getPatientsCheckinCheckout($from_date, $to_date) {
+        $sql = "SELECT
+                    p.id,
+                    p.name              AS patient_name,
+                    p.date_onboarded,
+                    p.time_onboarded,
+                    p.date_of_discharge,
+                    p.time_discharged,
+                    p.status            AS patient_status,
+                    s.bed_no            AS suite_number,
+                    fmc.name            AS floor_name
+                FROM people p
+                LEFT JOIN suites s ON s.id = p.suite_number AND s.is_deleted = 0
+                LEFT JOIN foodmenuconfig fmc ON fmc.id = p.floor_number AND fmc.listtype = 'floor'
+                WHERE p.date_onboarded IS NOT NULL AND p.date_onboarded <> '0000-00-00'
+                  AND (
+                        (p.date_onboarded >= ? AND p.date_onboarded <= ?)
+                        OR (p.date_of_discharge >= ? AND p.date_of_discharge <= ?)
+                  )
+                ORDER BY p.date_onboarded ASC, s.bed_no ASC, p.id ASC";
+        $query = $this->tenantDb->query($sql, [$from_date, $to_date, $from_date, $to_date]);
+        return $query->result_array();
+    }
+
+    /**
+     * Format a people row into display-ready check-in/out fields.
+     * Guards against legacy bad data (check-out earlier than check-in).
+     */
+    private function formatCheckinCheckoutRow($row) {
+        $checkinTs = null;
+        $checkin   = 'N/A';
+        if (!empty($row['time_onboarded']) && $row['time_onboarded'] != '0000-00-00 00:00:00') {
+            $checkin   = date('d M Y h:i A', strtotime($row['time_onboarded']));
+            $checkinTs = strtotime($row['time_onboarded']);
+        } elseif (!empty($row['date_onboarded']) && $row['date_onboarded'] != '0000-00-00') {
+            $checkin   = date('d M Y', strtotime($row['date_onboarded']));
+            $checkinTs = strtotime($row['date_onboarded']);
+        }
+
+        $hasDischargeDate = !empty($row['date_of_discharge']) && $row['date_of_discharge'] != '0000-00-00';
+        $checkout   = 'Still Checked In';
+        $checkoutTs = null;
+        if (!empty($row['time_discharged']) && $row['time_discharged'] != '0000-00-00 00:00:00') {
+            if (!empty($row['time_onboarded']) && strtotime($row['time_discharged']) < strtotime($row['time_onboarded'])) {
+                // Legacy timezone bug - fall back to date only.
+                $fallback   = $hasDischargeDate ? $row['date_of_discharge'] : $row['time_discharged'];
+                $checkout   = date('d M Y', strtotime($fallback));
+                $checkoutTs = strtotime($fallback);
+            } else {
+                $checkout   = date('d M Y h:i A', strtotime($row['time_discharged']));
+                $checkoutTs = strtotime($row['time_discharged']);
+            }
+        } elseif ($hasDischargeDate) {
+            $checkout   = date('d M Y', strtotime($row['date_of_discharge']));
+            $checkoutTs = strtotime($row['date_of_discharge']);
+        }
+
+        $status = $hasDischargeDate ? 'Discharged' : 'Active';
+
+        if ($checkoutTs && $checkinTs && $checkoutTs >= $checkinTs) {
+            $duration = $this->formatDuration($checkoutTs - $checkinTs);
+        } elseif (!$checkoutTs) {
+            $duration = 'Ongoing';
+        } else {
+            $duration = 'N/A';
+        }
+
+        return [
+            'checkin'  => $checkin,
+            'checkout' => $checkout,
+            'status'   => $status,
+            'duration' => $duration,
+        ];
+    }
+
+    /**
+     * Format a duration (seconds) into a compact "Xd Yh Zm" string.
+     */
+    private function formatDuration($seconds) {
+        $seconds = max(0, (int) $seconds);
+        $days  = floor($seconds / 86400);
+        $hours = floor(($seconds % 86400) / 3600);
+        $mins  = floor(($seconds % 3600) / 60);
+        $parts = [];
+        if ($days > 0)  { $parts[] = $days . 'd'; }
+        if ($hours > 0) { $parts[] = $hours . 'h'; }
+        if ($mins > 0 || empty($parts)) { $parts[] = $mins . 'm'; }
+        return implode(' ', $parts);
+    }
+
+    /**
+     * Report metadata (generated timestamp + generated-by user).
+     */
+    private function getReportMeta() {
+        $user = $this->ion_auth->user()->row();
+        $name = '';
+        if ($user) {
+            $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+            if ($name === '') { $name = $user->username ?? 'Unknown'; }
+        }
+        return [
+            'generated_at' => australia_date('d M Y h:i A'),
+            'generated_by' => $name !== '' ? $name : 'Unknown',
+        ];
+    }
+
+    // ---------------- Report pages ----------------
+
+    /**
+     * Resolve the from/to date range from the request, defaulting to current month.
+     */
+    private function resolveReportRange() {
+        $today     = australia_date_only();
+        $from_date = $this->input->post('from_date') ?: $this->input->get('from_date') ?: date('Y-m-01', strtotime($today));
+        $to_date   = $this->input->post('to_date')   ?: $this->input->get('to_date')   ?: date('Y-m-t', strtotime($today));
+        if (strtotime($from_date) > strtotime($to_date)) {
+            $tmp = $from_date; $from_date = $to_date; $to_date = $tmp;
+        }
+        return [$from_date, $to_date];
+    }
+
+    /** Report 1: Total Number of Active Patients (daily breakdown). */
+    public function activePatientsReport() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $data['days']       = $this->getActivePatientsByDay($from_date, $to_date);
+        $data['total_days'] = 0;
+        foreach ($data['days'] as $d) { $data['total_days'] += (int) $d['active']; }
+        $data['from_date']  = $from_date;
+        $data['to_date']    = $to_date;
+        $data['page_title'] = 'Total Number of Active Patients';
+        $data['pagefor']    = 'reports';
+
+        $this->load->view('general/header', $data);
+        $this->load->view('Orderportal/Reports/active_patients_report', $data);
+        $this->load->view('general/footer', $data);
+    }
+
+    /** Report 2: Total Number of Patients Ordered Food (per day). */
+    public function foodOrdersReport() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $data['rows']       = $this->getFoodOrdersByDay($from_date, $to_date);
+        $data['total']      = 0;
+        foreach ($data['rows'] as $r) { $data['total'] += (int) $r['patient_count']; }
+        $data['from_date']  = $from_date;
+        $data['to_date']    = $to_date;
+        $data['page_title'] = 'Total Number of Patients Ordered Food';
+        $data['pagefor']    = 'reports';
+
+        $this->load->view('general/header', $data);
+        $this->load->view('Orderportal/Reports/food_orders_report', $data);
+        $this->load->view('general/footer', $data);
+    }
+
+    /** Report 3: Total Number of Check-ins & Check-outs in the Day. */
+    public function checkinCheckoutCountReport() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $data['rows']            = $this->getCheckinCheckoutByDay($from_date, $to_date);
+        $data['total_checkins']  = 0;
+        $data['total_checkouts'] = 0;
+        foreach ($data['rows'] as $r) {
+            $data['total_checkins']  += (int) $r['check_ins'];
+            $data['total_checkouts'] += (int) $r['check_outs'];
+        }
+        $data['from_date']  = $from_date;
+        $data['to_date']    = $to_date;
+        $data['page_title'] = 'Check-ins & Check-outs in the Day';
+        $data['pagefor']    = 'reports';
+
+        $this->load->view('general/header', $data);
+        $this->load->view('Orderportal/Reports/checkin_checkout_count_report', $data);
+        $this->load->view('general/footer', $data);
+    }
+
+    /** Report 4: Patients Report with Check-ins & Check-outs. */
+    public function patientsCheckinCheckoutReport() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $records = $this->getPatientsCheckinCheckout($from_date, $to_date);
+        foreach ($records as &$rec) {
+            $rec['_fmt'] = $this->formatCheckinCheckoutRow($rec);
+        }
+        unset($rec);
+        $data['records']    = $records;
+        $data['from_date']  = $from_date;
+        $data['to_date']    = $to_date;
+        $data['page_title'] = 'Patients Report with Check-ins & Check-outs';
+        $data['pagefor']    = 'reports';
+
+        $this->load->view('general/header', $data);
+        $this->load->view('Orderportal/Reports/patients_checkin_checkout_report', $data);
+        $this->load->view('general/footer', $data);
+    }
+
+    // ---------------- Excel exports ----------------
+
+    /**
+     * Generic .xlsx output helper (PhpSpreadsheet).
+     * $headers = array of column titles; $rows = array of row arrays;
+     * $summaryRows = optional list of [label, value] rows appended after a blank line.
+     */
+    private function outputXlsx($filename, $title, $from_date, $to_date, $headers, $rows, $summaryRows = []) {
+        $meta = $this->getReportMeta();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $colCount = count($headers);
+        $lastCol  = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(1, $colCount));
+
+        $r = 1;
+        $sheet->setCellValue('A' . $r, $title);
+        $sheet->mergeCells('A' . $r . ':' . $lastCol . $r);
+        $sheet->getStyle('A' . $r)->getFont()->setBold(true)->setSize(14);
+        $r++;
+
+        $sheet->setCellValue('A' . $r, 'Date Range: ' . date('d M Y', strtotime($from_date)) . ' to ' . date('d M Y', strtotime($to_date)));
+        $sheet->mergeCells('A' . $r . ':' . $lastCol . $r);
+        $r++;
+
+        $sheet->setCellValue('A' . $r, 'Generated On: ' . $meta['generated_at']);
+        $sheet->mergeCells('A' . $r . ':' . $lastCol . $r);
+        $r++;
+
+        $sheet->setCellValue('A' . $r, 'Generated By: ' . $meta['generated_by']);
+        $sheet->mergeCells('A' . $r . ':' . $lastCol . $r);
+        $r += 2; // blank spacer row
+
+        // Header row
+        $headerRow = $r;
+        $col = 1;
+        foreach ($headers as $h) {
+            $sheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $r, $h);
+            $col++;
+        }
+        $headerRange = 'A' . $headerRow . ':' . $lastCol . $headerRow;
+        $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle($headerRange)->getFill()
+              ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+              ->getStartColor()->setRGB('5156BE');
+        $r++;
+
+        // Data rows
+        foreach ($rows as $dataRow) {
+            $col = 1;
+            foreach ($dataRow as $val) {
+                $sheet->setCellValueExplicit(
+                    \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $r,
+                    (string) $val,
+                    \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                );
+                $col++;
+            }
+            $r++;
+        }
+
+        // Summary rows
+        if (!empty($summaryRows)) {
+            $r++;
+            foreach ($summaryRows as $sRow) {
+                $col = 1;
+                foreach ($sRow as $val) {
+                    $sheet->setCellValue(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $r, $val);
+                    $col++;
+                }
+                $sheet->getStyle('A' . $r)->getFont()->setBold(true);
+                $r++;
+            }
+        }
+
+        for ($c = 1; $c <= $colCount; $c++) {
+            $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c))->setAutoSize(true);
+        }
+
+        // Prevent any prior output from corrupting the binary stream.
+        while (ob_get_level() > 0) { ob_end_clean(); }
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
+    }
+
+    /** Export Report 1: Active Patients. */
+    public function exportActivePatients() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $days = $this->getActivePatientsByDay($from_date, $to_date);
+
+        $headers = ['Date', 'Active Patients', 'Patient Names Active', 'Onboarded', 'Discharged'];
+        $rows = [];
+        $totalActive = 0;
+        foreach ($days as $d) {
+            $totalActive += (int) $d['active'];
+            $rows[] = [
+                date('d M Y', strtotime($d['date'])),
+                (int) $d['active'],
+                implode(', ', $d['names']),
+                (int) $d['onboarded'],
+                (int) $d['discharged'],
+            ];
+        }
+        $summary = [['Total Active Patient-Days', $totalActive]];
+
+        $this->outputXlsx(
+            'active_patients_report_' . date('Y-m-d_His') . '.xlsx',
+            'Total Number of Active Patients',
+            $from_date, $to_date, $headers, $rows, $summary
+        );
+    }
+
+    /** Export Report 2: Patients Ordered Food. */
+    public function exportFoodOrders() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $data = $this->getFoodOrdersByDay($from_date, $to_date);
+
+        $headers = ['Date', 'No. of Patients Ordered'];
+        $rows = [];
+        $total = 0;
+        foreach ($data as $d) {
+            $total += (int) $d['patient_count'];
+            $rows[] = [
+                date('d M Y', strtotime($d['order_date'])),
+                (int) $d['patient_count'],
+            ];
+        }
+        $summary = [['Total', $total]];
+
+        $this->outputXlsx(
+            'food_orders_report_' . date('Y-m-d_His') . '.xlsx',
+            'Total Number of Patients Ordered Food',
+            $from_date, $to_date, $headers, $rows, $summary
+        );
+    }
+
+    /** Export Report 3: Check-ins & Check-outs count. */
+    public function exportCheckinCheckoutCount() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $data = $this->getCheckinCheckoutByDay($from_date, $to_date);
+
+        $headers = ['Date', 'Check-ins', 'Check-outs'];
+        $rows = [];
+        $totalIn = 0; $totalOut = 0;
+        foreach ($data as $d) {
+            $totalIn  += (int) $d['check_ins'];
+            $totalOut += (int) $d['check_outs'];
+            $rows[] = [
+                date('d M Y', strtotime($d['date'])),
+                (int) $d['check_ins'],
+                (int) $d['check_outs'],
+            ];
+        }
+        $summary = [
+            ['Total Check-ins', $totalIn],
+            ['Total Check-outs', $totalOut],
+        ];
+
+        $this->outputXlsx(
+            'checkin_checkout_count_' . date('Y-m-d_His') . '.xlsx',
+            'Check-ins & Check-outs in the Day',
+            $from_date, $to_date, $headers, $rows, $summary
+        );
+    }
+
+    /** Export Report 4: Patients with Check-ins & Check-outs. */
+    public function exportPatientsCheckinCheckout() {
+        list($from_date, $to_date) = $this->resolveReportRange();
+        $records = $this->getPatientsCheckinCheckout($from_date, $to_date);
+
+        $headers = ['Patient Name', 'Suite No', 'Check-in', 'Check-out', 'Status', 'Duration'];
+        $rows = [];
+        foreach ($records as $rec) {
+            $fmt = $this->formatCheckinCheckoutRow($rec);
+            $rows[] = [
+                $rec['patient_name'] ?: 'N/A',
+                $rec['suite_number'] ?: 'N/A',
+                $fmt['checkin'],
+                $fmt['checkout'],
+                $fmt['status'],
+                $fmt['duration'],
+            ];
+        }
+        $summary = [['Total Patients', count($records)]];
+
+        $this->outputXlsx(
+            'patients_checkin_checkout_' . date('Y-m-d_His') . '.xlsx',
+            'Patients Report with Check-ins & Check-outs',
+            $from_date, $to_date, $headers, $rows, $summary
+        );
     }
 
     /**
