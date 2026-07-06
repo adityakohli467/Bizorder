@@ -604,7 +604,14 @@ class Reports extends MY_Controller {
         $data['range_onboarded']   = $this->countOnboardedInRange($from_date, $to_date);
         $data['range_discharged']  = $this->countDischargedInRange($from_date, $to_date);
         $data['range_active']      = $rangeActiveSum;
-        $data['range_food_orders'] = $this->countFoodOrderPatientsInRange($from_date, $to_date);
+
+        // Sum of per-day patient counts so this matches the Food Orders report
+        // total exactly (a patient who orders on multiple days counts each day).
+        $rangeFoodOrders = 0;
+        foreach ($this->getFoodOrdersByDay($from_date, $to_date) as $fr) {
+            $rangeFoodOrders += (int) $fr['patient_count'];
+        }
+        $data['range_food_orders'] = $rangeFoodOrders;
 
         // ---- Sparkline trend series ----
         // Today cards: last 14 days ending today.
