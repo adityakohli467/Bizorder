@@ -659,14 +659,14 @@ button .svg-inline--fa path {
                                             <!-- Active suite actions -->
                                             <div class="space-y-3">
                                                 <?php if (isset($bedList['is_vaccant']) && $bedList['is_vaccant'] == 0) { ?>
-                                                    <!-- Occupied suites: View Details + Transfer side by side -->
-                                                    <div class="flex space-x-3">
-                                                        <a href="/Orderportal/Hospitalconfig/viewSuite/<?php echo $bedList['suite_id']; ?>" class="block flex-1">
+                                                    <!-- Occupied suites: View Details + Transfer stacked vertically -->
+                                                    <div class="flex flex-col space-y-3">
+                                                        <a href="/Orderportal/Hospitalconfig/viewSuite/<?php echo $bedList['suite_id']; ?>" class="block">
                                                             <button class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center">
                                                                 <i class="fa-solid fa-eye mr-2"></i>View Details
                                                             </button>
                                                         </a>
-                                                        <button class="transfer-suite-btn flex-1 bg-orange-500 text-white py-3 px-4 rounded-lg hover:bg-orange-600 transition-colors font-medium flex items-center justify-center" data-suite-id="<?php echo $bedList['suite_id']; ?>" data-suite-number="<?php echo htmlspecialchars($bedList['bed_no']); ?>" title="Transfer Client">
+                                                        <button class="transfer-suite-btn w-full bg-red-500 text-white py-3 px-4 rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center" data-suite-id="<?php echo $bedList['suite_id']; ?>" data-suite-number="<?php echo htmlspecialchars($bedList['bed_no']); ?>" title="Transfer Client">
                                                             <i class="fa-solid fa-exchange-alt mr-2"></i>Transfer
                                                         </button>
                                                     </div>
