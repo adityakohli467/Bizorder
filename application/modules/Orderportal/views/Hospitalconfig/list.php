@@ -161,8 +161,8 @@ button .svg-inline--fa path {
 .transfer-suite-btn svg path,
 .transfer-suite-btn .svg-inline--fa,
 .transfer-suite-btn .svg-inline--fa path {
-    color: #f57c00 !important;
-    fill: #f57c00 !important;
+    color: #ffffff !important;
+    fill: #ffffff !important;
 }
 
 /* Transfer modal button styling */
@@ -595,12 +595,6 @@ button .svg-inline--fa path {
                                         </span>
                                                 
                                                 <div class="flex space-x-2">
-                                                    <?php if (isset($bedList['is_vaccant']) && $bedList['is_vaccant'] == 0) { ?>
-                                                        <!-- Transfer icon only for occupied suites -->
-                                                        <button class="transfer-suite-btn bg-white text-orange-600 hover:bg-orange-600 hover:text-white w-8 h-8 rounded-full shadow-sm border border-gray-200 flex items-center justify-center transition-all duration-200" data-suite-id="<?php echo $bedList['suite_id']; ?>" data-suite-number="<?php echo htmlspecialchars($bedList['bed_no']); ?>" title="Transfer Client">
-                                                            <i class="fa-solid fa-exchange-alt text-sm"></i>
-                                                        </button>
-                                                    <?php } ?>
                                                     <button class="edit-suite-btn bg-white text-green-600 hover:bg-green-600 hover:text-white w-8 h-8 rounded-full shadow-sm border border-gray-200 flex items-center justify-center transition-all duration-200" data-suite-id="<?php echo $bedList['suite_id']; ?>">
                                                         <i class="fa-solid fa-edit text-sm"></i>
                                                     </button>
@@ -665,12 +659,17 @@ button .svg-inline--fa path {
                                             <!-- Active suite actions -->
                                             <div class="space-y-3">
                                                 <?php if (isset($bedList['is_vaccant']) && $bedList['is_vaccant'] == 0) { ?>
-                                                    <!-- Show View Details only for occupied suites -->
-                                                    <a href="/Orderportal/Hospitalconfig/viewSuite/<?php echo $bedList['suite_id']; ?>" class="block">
-                                                        <button class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center">
-                                                            <i class="fa-solid fa-eye mr-2"></i>View Details
+                                                    <!-- Occupied suites: View Details + Transfer side by side -->
+                                                    <div class="flex space-x-3">
+                                                        <a href="/Orderportal/Hospitalconfig/viewSuite/<?php echo $bedList['suite_id']; ?>" class="block flex-1">
+                                                            <button class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center">
+                                                                <i class="fa-solid fa-eye mr-2"></i>View Details
+                                                            </button>
+                                                        </a>
+                                                        <button class="transfer-suite-btn flex-1 bg-orange-500 text-white py-3 px-4 rounded-lg hover:bg-orange-600 transition-colors font-medium flex items-center justify-center" data-suite-id="<?php echo $bedList['suite_id']; ?>" data-suite-number="<?php echo htmlspecialchars($bedList['bed_no']); ?>" title="Transfer Client">
+                                                            <i class="fa-solid fa-exchange-alt mr-2"></i>Transfer
                                                         </button>
-                                                    </a>
+                                                    </div>
                                                 <?php } ?>
                                                 <?php if (isset($bedList['is_vaccant']) && $bedList['is_vaccant'] == 1) { ?>
                                                     <!-- Show Onboard Client only for vacant suites -->

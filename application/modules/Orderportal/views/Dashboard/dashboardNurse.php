@@ -2785,6 +2785,23 @@
                 const mealSections = document.getElementById('meal-sections');
                 mealSections.innerHTML = '';
                 document.getElementById('notes-textarea').value = menuData.orderComment || '';
+
+                // STALE-ALLERGEN FIX: refresh this suite's cached patient data with the
+                // fresh values returned by the backend. When a suite was re-occupied while
+                // the dashboard was left open (previous patient checked out, new patient
+                // checked in), the cached bedLists entry may still hold the previous
+                // occupant's allergens. Update it BEFORE any allergen filtering/display so
+                // the current occupant's data is always used.
+                if (menuData.patient_allergies !== undefined) {
+                    const cachedBed = bedLists.find(b => b.id == bedId);
+                    if (cachedBed) {
+                        cachedBed.patient_name = menuData.patient_name || null;
+                        cachedBed.patient_allergies = menuData.patient_allergies || null;
+                        cachedBed.patient_dietary_preferences = menuData.patient_dietary_preferences || null;
+                        cachedBed.allergy_count = menuData.allergy_count || 0;
+                        cachedBed.has_high_allergies = menuData.has_high_allergies || false;
+                    }
+                }
                 
                 // Set Room Service checkbox based on backend data
                 const roomServiceCheckbox = document.getElementById('room-service-checkbox');

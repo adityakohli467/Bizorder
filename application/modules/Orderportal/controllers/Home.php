@@ -1641,33 +1641,52 @@ class Home extends MY_Controller {
             $conditions = array('listtype' => 'category', 'is_deleted' => '0');
             $categories = $this->common_model->fetchRecordsDynamically('foodmenuconfig', '', $conditions);
             
-            // 🆕 SPECIAL ITEMS FEATURE: Get patient allergy count
+            // 🆕 SPECIAL ITEMS FEATURE + STALE-ALLERGEN FIX:
+            // Get the CURRENT active patient for this suite. When a suite is re-occupied
+            // (previous patient checked out, new patient checked in) there can briefly be
+            // more than one status=1 record if the discharged record has not yet been
+            // auto-cleaned. Always select the CURRENT occupant (empty/future discharge
+            // date, most recently onboarded) so the new patient never inherits the
+            // previous patient's allergies or dietary preferences.
             $patientInfo = $this->common_model->fetchRecordsDynamically(
                 'people',
-                ['allergies'],
-                ['suite_number' => $bedId, 'status' => 1]
+                ['name', 'allergies', 'dietary_preferences', 'date_of_discharge'],
+                ['suite_number' => $bedId, 'status' => 1],
+                'date_onboarded DESC, id DESC'
             );
+            
+            $activePatient = null;
+            $todayDate = date('Y-m-d');
+            if (!empty($patientInfo)) {
+                foreach ($patientInfo as $p) {
+                    $dischargeDate = $p['date_of_discharge'] ?? null;
+                    if (empty($dischargeDate) || $dischargeDate > $todayDate) {
+                        $activePatient = $p;
+                        break;
+                    }
+                }
+            }
+            
+            $activePatientName = $activePatient ? ($activePatient['name'] ?? null) : null;
+            $activeAllergies   = $activePatient ? ($activePatient['allergies'] ?? null) : null;
+            $activeDietary     = $activePatient ? ($activePatient['dietary_preferences'] ?? null) : null;
             
             $allergyCount = 0;
             $showSpecialItems = false;
             
-            if (!empty($patientInfo)) {
-                $allergiesData = $patientInfo[0]['allergies'];
-                
-                if (!empty($allergiesData)) {
-                    // Try to parse as JSON first
-                    $allergyArray = json_decode($allergiesData, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($allergyArray)) {
-                        $allergyCount = count($allergyArray);
-                    } else {
-                        // Fallback: count comma-separated values
-                        $allergyArray = explode(',', $allergiesData);
-                        $allergyArray = array_filter(array_map('trim', $allergyArray));
-                        $allergyCount = count($allergyArray);
-                    }
+            if (!empty($activeAllergies)) {
+                // Try to parse as JSON first
+                $allergyArray = json_decode($activeAllergies, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($allergyArray)) {
+                    $allergyCount = count($allergyArray);
+                } else {
+                    // Fallback: count comma-separated values
+                    $allergyArray = explode(',', $activeAllergies);
+                    $allergyArray = array_filter(array_map('trim', $allergyArray));
+                    $allergyCount = count($allergyArray);
                 }
                 
-                // Show special items if patient has 3+ allergies
+                // Show special items if patient has 2+ allergies
                 $showSpecialItems = $allergyCount >= 2;
             }
             
@@ -1848,7 +1867,16 @@ class Home extends MY_Controller {
                 'orderComment' => $orderComment,
                 'roomServiceEnabled' => $roomServiceEnabled,
                 'allergyCount' => $allergyCount, // 🆕 SPECIAL ITEMS FEATURE
-                'hasHighAllergies' => $showSpecialItems // 🆕 SPECIAL ITEMS FEATURE
+                'hasHighAllergies' => $showSpecialItems, // 🆕 SPECIAL ITEMS FEATURE
+                // STALE-ALLERGEN FIX: return the CURRENT active patient so the client can
+                // refresh its cached suite data before filtering/displaying allergens.
+                // This prevents a newly checked-in patient from seeing the previous
+                // (checked-out) occupant's allergens when the dashboard was left open.
+                'patient_name' => $activePatientName,
+                'patient_allergies' => $activeAllergies,
+                'patient_dietary_preferences' => $activeDietary,
+                'allergy_count' => $allergyCount,
+                'has_high_allergies' => $showSpecialItems
             ]);
             
         } catch (Exception $e) {
