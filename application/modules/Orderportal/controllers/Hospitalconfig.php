@@ -974,16 +974,29 @@ public function updateSuite() {
 public function deleteBed() {
     $this->load->helper('custom');
     $bedId = $this->input->post('id');
-    $userId = $this->ion_auth->user()->row()->id;
-    $userEmail = $this->ion_auth->user()->row()->email;
+    $currentUser = $this->ion_auth->user()->row();
+    $userId = $currentUser->id;
+    $userEmail = $currentUser->email;
+    $userName = trim(($currentUser->first_name ?? '') . ' ' . ($currentUser->last_name ?? ''));
     $userIP = $this->input->ip_address();
-    
+    $deletedAt = australia_datetime();
+
     $suite = $this->tenantDb->where('id', $bedId)->get('suites')->row_array();
     $suiteNumber = $suite ? $suite['bed_no'] : 'Unknown';
     $floor = $suite ? $suite['floor'] : 'Unknown';
-    
+
+    // Build audit log of who deleted this suite and when
+    $deleteLog = json_encode(array(
+        'deleted_by_id'    => $userId,
+        'deleted_by_email' => $userEmail,
+        'deleted_by_name'  => $userName,
+        'deleted_at'       => $deletedAt,
+        'ip'               => $userIP
+    ));
+
     $deleteData = array(
-        'is_deleted' => 1
+        'is_deleted' => 1,
+        'deletelog'  => $deleteLog
     );
     $this->common_model->commonRecordUpdate('suites', 'id', $bedId, $deleteData);
     $affected_rows = $this->tenantDb->affected_rows();
