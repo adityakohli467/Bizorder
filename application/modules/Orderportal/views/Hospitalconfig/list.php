@@ -385,9 +385,12 @@ button .svg-inline--fa path {
                                                     <i class="fas fa-eye me-1"></i>View Active Suites
                                                 </a>
                                             <?php else: ?>
+                                                <?php $userRole = isset($userRole) ? $userRole : 0;
+                                                    if ($userRole != 3 && $userRole != 16 && $userRole != 4): ?>
                                                 <a class="btn btn-outline-warning btn" href="<?php echo base_url('Orderportal/Hospitalconfig/List?show_deleted=1') ?>">
                                                     <i class="fas fa-trash-restore me-1"></i>View Deleted Suites
                                                 </a>
+                                            <?php endif; ?>
                                             <?php endif; ?>
                                             <?php if (!isset($show_deleted) || !$show_deleted): ?>
                                                 <a class="btn btn-danger btn" href="<?php echo base_url('Orderportal/Hospitalconfig/addBed') ?>">
@@ -601,7 +604,7 @@ button .svg-inline--fa path {
                                                     <?php 
                                                     // ✅ FIX: Hide delete button for nurses (role 3)
                                                     $userRole = isset($userRole) ? $userRole : 0;
-                                                    if ($userRole != 3): ?>
+                                                    if ($userRole != 3 && $userRole != 16 && $userRole != 4): ?>
                                                     <button class="delete-suite-btn bg-white text-red-600 hover:bg-red-600 hover:text-white w-8 h-8 rounded-full shadow-sm border border-gray-200 flex items-center justify-center transition-all duration-200" data-suite-id="<?php echo $bedList['suite_id']; ?>">
                                                         <i class="fa-solid fa-trash text-sm"></i>
                                                     </button>
