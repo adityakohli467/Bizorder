@@ -1560,29 +1560,40 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Filter suites: only show if not dismissed OR modified after dismissal
                         const newSuites = order.suites.filter(suite => {
                             const dismissedTime = dismissedSuites[suite.suite_number];
-                            
-                            // ✅ CRITICAL FIX: Normalize times for comparison (trim whitespace, handle null/undefined)
+
+                            // Normalize values (trim whitespace, handle null/undefined)
                             const normalizedDismissedTime = dismissedTime ? String(dismissedTime).trim() : null;
-                            const normalizedSuiteTime = suite.time ? String(suite.time).trim() : null;
-                            
-                            // Show suite if:
-                            // 1. Never dismissed before (no dismissedTime), OR
-                            // 2. Activity time is DIFFERENT (indicating modification after dismissal)
-                            // 
-                            // IMPORTANT: If dismissedTime exists and matches suite.time, suite was already dismissed.
-                            // Only show again if time changed (suite was updated after dismissal).
-                            const isNew = !normalizedDismissedTime || normalizedDismissedTime !== normalizedSuiteTime;
-                            
+                            const activityTime = suite.activity_time ? String(suite.activity_time).trim() : null;
+
+                            // Show suite only if:
+                            // 1. Never dismissed before, OR
+                            // 2. It has genuinely NEWER activity than when it was dismissed.
+                            // Once dismissed, it stays hidden until a new/updated late order occurs.
+                            let isNew;
+                            if (!normalizedDismissedTime) {
+                                isNew = true;
+                            } else {
+                                const dismissedTs = Date.parse(normalizedDismissedTime.replace(' ', 'T'));
+                                const activityTs = activityTime ? Date.parse(activityTime.replace(' ', 'T')) : NaN;
+                                if (!isNaN(dismissedTs) && !isNaN(activityTs)) {
+                                    isNew = activityTs > dismissedTs;
+                                } else {
+                                    // Legacy fallback for old display-time dismissal records
+                                    const normalizedSuiteTime = suite.time ? String(suite.time).trim() : null;
+                                    isNew = normalizedDismissedTime !== normalizedSuiteTime;
+                                }
+                            }
+
                             if (isNew) {
                                 if (normalizedDismissedTime) {
-                                    console.log(`  ✓ Suite ${suite.suite_number} is modified after dismissal (dismissed: ${normalizedDismissedTime}, current: ${normalizedSuiteTime})`);
+                                    console.log(`  ✓ Suite ${suite.suite_number} has newer activity than dismissal (dismissed: ${normalizedDismissedTime}, current: ${activityTime})`);
                                 } else {
                                     console.log(`  ✓ Suite ${suite.suite_number} is new/modified (action: ${suite.action})`);
                                 }
                             } else {
-                                console.log(`  ⏭️ Suite ${suite.suite_number} already dismissed at ${normalizedDismissedTime} (matches current time: ${normalizedSuiteTime})`);
+                                console.log(`  ⏭️ Suite ${suite.suite_number} already dismissed (dismissed: ${normalizedDismissedTime}, current: ${activityTime})`);
                             }
-                            
+
                             return isNew;
                         });
                         

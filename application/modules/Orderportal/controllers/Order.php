@@ -6119,6 +6119,8 @@ class Order extends MY_Controller
                         'suite_number' => $suite['suite_number'],
                         'action' => $isNewSuite ? 'NEW ORDER' : 'ORDER UPDATED',
                         'time' => date('g:i A', $modifiedTime > $addedTime ? $modifiedTime : $addedTime),
+                        // Stable, sortable activity timestamp used for reliable dismissal matching
+                        'activity_time' => date('Y-m-d H:i:s', $modifiedTime > $addedTime ? $modifiedTime : $addedTime),
                         'by' => $suite['added_by_name'] ?: 'Unknown User',
                         'items' => $foodItems // 🔧 Food items ordered
                     ];
@@ -6166,6 +6168,8 @@ class Order extends MY_Controller
                             'suite_number' => $suiteInfo['bed_no'] ?? 'Unknown',
                             'action' => ($createdTime === $updatedTime) ? 'NEW ORDER' : 'ORDER UPDATED',
                             'time' => date('g:i A', $latestTime),
+                            // Stable, sortable activity timestamp used for reliable dismissal matching
+                            'activity_time' => date('Y-m-d H:i:s', $latestTime),
                             'by' => 'User',
                             'items' => $foodItems // 🔧 Food items ordered
                         ];
@@ -6328,7 +6332,8 @@ class Order extends MY_Controller
                 
                 foreach ($order['suites'] as $suite) {
                     $suiteNumber = $suite['suite_number'];
-                    $dismissedTime = $suite['time'];
+                    // Store the stable activity timestamp so re-alerts only happen on genuinely newer activity
+                    $dismissedTime = $suite['activity_time'] ?? $suite['time'];
                     
                     // Insert or update dismissal
                     // ✅ CRITICAL FIX: Include order_date in duplicate check to match unique key idx_user_order_suite
