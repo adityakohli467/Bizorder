@@ -540,12 +540,12 @@ class Order extends MY_Controller
     // place order from patient portal - ENHANCED WITH FLOOR CONSOLIDATION
     
     function placeOrder(){
-        // TEMPORARILY DISABLED - Check cutoff time (10:30 AM) for next day orders (reception/patient users only)
-        // if (!$this->isWithinOrderCutoffTime()) {
-        //     $this->session->set_flashdata('error', 'Order cutoff time has passed. Orders for tomorrow must be placed before 10:30 AM today.');
-        //     redirect('Orderportal/Home/index');
-        //     return;
-        // }
+        // Check cutoff time (10:30 AM) for next day orders (reception/patient users only)
+        if (!$this->isWithinOrderCutoffTime()) {
+            $this->session->set_flashdata('error', 'Order cutoff time has passed. Orders for tomorrow must be placed before 10:30 AM today.');
+            redirect('Orderportal/Home/index');
+            return;
+        }
 
         $this->load->helper('custom'); // Load custom helper for Australia timezone functions
         

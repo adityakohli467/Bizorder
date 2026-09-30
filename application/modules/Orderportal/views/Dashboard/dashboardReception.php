@@ -384,8 +384,7 @@
                         <?php 
                         $userRole = $this->ion_auth->get_users_groups()->row()->id;
                         $this->load->helper('custom'); $currentTime = australia_date('H:i');
-                        // TEMPORARILY DISABLED - cutoff time warning
-                        $isPastCutoff = false; // ($userRole == 6 || $userRole == 4) && $currentTime >= '10:30';
+                        $isPastCutoff = ($userRole == 6 || $userRole == 4) && $currentTime >= '10:30';
                         ?>
                         <?php if ($isPastCutoff): ?>
                         <div class="mt-4 p-4 bg-red-100 border-2 border-red-400 rounded-lg animate-pulse">
@@ -2019,12 +2018,7 @@
                 });
             });
 
-            // Update choice counters
-            function updateChoiceCounters() {
-                document.querySelectorAll('[data-group]').forEach(group => {
-                    updateChoiceCounter(group);
-                });
-            }
+            // Update choice counters - defined in outer scope below (see updateChoiceCounters)
 
             // Check if order already exists for this bed (Reception - with date)
             function checkExistingOrder(bedId, orderDate) {
@@ -2298,23 +2292,23 @@
                 // Check if override is active
                 const nurseOverrideActive = sessionStorage.getItem('nurseOverrideActive') === 'true';
                 
-                // TEMPORARILY DISABLED - Check cutoff time for reception/patient users (unless override is active)
-                // if ((userRole == 6 || userRole == 4) && !nurseOverrideActive) { // Reception or Patient (no override)
-                //     // Use Australia timezone for cutoff check
-                //     const now = new Date();
-                //     const australiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Australia/Sydney"}));
-                //     const currentHour = australiaTime.getHours();
-                //     const currentMinute = australiaTime.getMinutes();
-                //     const currentTime = currentHour * 60 + currentMinute; // Convert to minutes
-                //     const cutoffTime = 10 * 60 + 30; // 10:30 AM in minutes
-                //     
-                //     // Only block if it's past 10:30 AM Australia time
-                //     if (currentTime >= cutoffTime) {
-                //         e.preventDefault();
-                //         alert('⏰ Order cutoff time has passed!\n\nOrders for tomorrow must be placed before 10:30 AM Australia time.\n\nPlease use "Override" button to place orders after cutoff.');
-                //         return false;
-                //     }
-                // }
+                // Check cutoff time for reception/patient users (unless override is active)
+                if ((userRole == 6 || userRole == 4) && !nurseOverrideActive) { // Reception or Patient (no override)
+                    // Use Australia timezone for cutoff check
+                    const now = new Date();
+                    const australiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Australia/Sydney"}));
+                    const currentHour = australiaTime.getHours();
+                    const currentMinute = australiaTime.getMinutes();
+                    const currentTime = currentHour * 60 + currentMinute; // Convert to minutes
+                    const cutoffTime = 10 * 60 + 30; // 10:30 AM in minutes
+                    
+                    // Only block if it's past 10:30 AM Australia time
+                    if (currentTime >= cutoffTime) {
+                        e.preventDefault();
+                        alert('⏰ Order cutoff time has passed!\n\nOrders for tomorrow must be placed before 10:30 AM Australia time.\n\nPlease use "Override" button to place orders after cutoff.');
+                        return false;
+                    }
+                }
                 // Nurses (role 3) bypass cutoff time check completely
                 // Also bypass if override is active
                 
@@ -3863,6 +3857,13 @@ const checkedRestricted = Array.from(allRestricted).filter(cb => cb.checked);
                     counterElement.className = 'ml-2 text-sm font-normal text-gray-500';
                 }
             }
+        }
+
+        // Update choice counters for all groups
+        function updateChoiceCounters() {
+            document.querySelectorAll('[data-group]').forEach(group => {
+                updateChoiceCounter(group);
+            });
         }
 
         // Function to setup choice counter listeners
