@@ -650,6 +650,61 @@ button .svg-inline--fa path {
                                             </div>
                                         </div>
 
+                                        <?php
+                                        // Row 3b: Patient allergens & dietary preferences (occupied suites only)
+                                        if (!(isset($show_deleted) && $show_deleted) && isset($bedList['is_vaccant']) && $bedList['is_vaccant'] == 0):
+                                            // Convert stored ID arrays to readable names
+                                            $resolveNames = function ($rawJson, $lookup) {
+                                                $names = [];
+                                                if (!empty($rawJson) && $rawJson !== 'null' && $rawJson !== '[]') {
+                                                    $ids = json_decode($rawJson, true);
+                                                    if (is_array($ids) && !empty($ids) && !empty($lookup)) {
+                                                        foreach ($ids as $id) {
+                                                            foreach ($lookup as $row) {
+                                                                if ($row['id'] == $id) { $names[] = $row['name']; break; }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                return $names;
+                                            };
+                                            $allergyNames = $resolveNames($bedList['patient_allergies'] ?? '', isset($allergensData) ? $allergensData : []);
+                                            $dietaryNames = $resolveNames($bedList['patient_dietary_preferences'] ?? '', isset($cuisineData) ? $cuisineData : []);
+                                        ?>
+                                        <div class="mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                                            <div class="flex items-start">
+                                                <i class="fa-solid fa-triangle-exclamation text-red-500 mr-2 mt-1"></i>
+                                                <div>
+                                                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Allergies</span>
+                                                    <?php if (!empty($allergyNames)): ?>
+                                                        <div class="flex flex-wrap gap-1 mt-1">
+                                                            <?php foreach ($allergyNames as $an): ?>
+                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><?php echo htmlspecialchars($an); ?></span>
+                                                            <?php endforeach; ?>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <div class="text-sm text-gray-500 mt-1">None</div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-start">
+                                                <i class="fa-solid fa-utensils text-green-600 mr-2 mt-1"></i>
+                                                <div>
+                                                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dietary</span>
+                                                    <?php if (!empty($dietaryNames)): ?>
+                                                        <div class="flex flex-wrap gap-1 mt-1">
+                                                            <?php foreach ($dietaryNames as $dn): ?>
+                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><?php echo htmlspecialchars($dn); ?></span>
+                                                            <?php endforeach; ?>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <div class="text-sm text-gray-500 mt-1">None</div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <?php endif; ?>
+
                                         <!-- Row 4: Action Buttons -->
                                         <?php if (isset($show_deleted) && $show_deleted): ?>
                                             <!-- Deleted suite actions -->

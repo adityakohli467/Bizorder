@@ -39,9 +39,29 @@ class Hospitalconfig extends MY_Controller
         $userRole = $this->ion_auth->get_users_groups()->row()->id ?? 0;
         $data['userRole'] = $userRole;
         
+        // Allergen & dietary (cuisine) lookups to display patient preferences on suite cards
+        $data['allergensData'] = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['id', 'name'], ['listtype' => 'allergen', 'is_deleted' => '0']);
+        $data['cuisineData']   = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['id', 'name'], ['listtype' => 'cuisine', 'is_deleted' => '0']);
         
     	$this->load->view('general/landingPageHeader');
         $this->load->view('Hospitalconfig/list',$data);
+        $this->load->view('general/landingPageFooter');    
+    }
+    
+    function peopleList(){
+        // Currently on-board patients (active, not discharged)
+        $data['people'] = $this->menu_model->fetchActivePeople();
+        
+        // Floor id -> name lookup
+        $conditions = array('location_id' => $this->selected_location_id, 'is_deleted' => 0, 'listtype' => 'floor');
+        $data['floorLists'] = $this->common_model->fetchRecordsDynamically('foodmenuconfig','',$conditions);
+        
+        // Allergen & dietary (cuisine) id -> name lookups
+        $data['allergensData'] = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['id', 'name'], ['listtype' => 'allergen', 'is_deleted' => '0']);
+        $data['cuisineData']   = $this->common_model->fetchRecordsDynamically('foodmenuconfig', ['id', 'name'], ['listtype' => 'cuisine', 'is_deleted' => '0']);
+        
+    	$this->load->view('general/landingPageHeader');
+        $this->load->view('Hospitalconfig/peopleList',$data);
         $this->load->view('general/landingPageFooter');    
     }
     

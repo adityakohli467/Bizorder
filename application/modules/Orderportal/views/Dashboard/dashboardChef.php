@@ -202,6 +202,25 @@
             color: white !important;
         }
         
+        /* On-board Patients button */
+        .people-list-btn {
+            background-color: #0d9488 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 12px 24px !important;
+            font-weight: 600 !important;
+            width: 100% !important;
+            text-align: center !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        .people-list-btn:hover {
+            background-color: #0d9488 !important;
+            color: white !important;
+        }
+        
         /* Add Menu button - no hover effects */
         .add-menu-btn:hover {
             background-color: #4285f4 !important;
@@ -933,6 +952,10 @@ function showFilterFeedback(day, meal) {
                                 <a class="production-form-btn text-decoration-none" href="<?php echo base_url('Orderportal/Order/viewProductionForm')  ?>">
                                     <i class="fa-solid fa-file-alt mr-2"></i>
                                     Production Form
+                                </a>
+                                <a class="people-list-btn text-decoration-none mt-3" href="<?php echo base_url('Orderportal/Hospitalconfig/peopleList')  ?>">
+                                    <i class="fa-solid fa-users mr-2"></i>
+                                    On-board Patients
                                 </a>
                             </div>
                         </div>

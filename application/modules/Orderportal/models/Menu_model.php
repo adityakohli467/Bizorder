@@ -18,7 +18,7 @@ class Menu_model extends CI_Model{
    public function fetchAllBedDetails($show_deleted = false){
      // Use DISTINCT to prevent duplicate suite records
      $this->tenantDb->distinct();
-     $this->tenantDb->select('s.bed_no, s.floor, s.is_vaccant, s.id as suite_id, s.is_deleted, p.name as patient_name');
+     $this->tenantDb->select('s.bed_no, s.floor, s.is_vaccant, s.id as suite_id, s.is_deleted, p.name as patient_name, p.allergies as patient_allergies, p.dietary_preferences as patient_dietary_preferences');
      $this->tenantDb->from($this->suitesTable . ' as s');
      $this->tenantDb->join('people as p', 's.id = p.suite_number AND (p.date_of_discharge IS NULL OR p.date_of_discharge >= CURDATE()) AND p.status = 1', 'left');
      $this->tenantDb->where('s.status', 1);
@@ -36,6 +36,20 @@ class Menu_model extends CI_Model{
 
      $query = $this->tenantDb->get();
      return $query->result_array();
+}
+
+   /**
+    * Fetch currently on-board people (active, not discharged) with their suite & floor.
+    * Used by the chef portal People listing page.
+    */
+   public function fetchActivePeople(){
+     $this->tenantDb->select('p.id, p.name, p.allergies, p.dietary_preferences, p.date_onboarded, s.bed_no, s.floor');
+     $this->tenantDb->from('people as p');
+     $this->tenantDb->join($this->suitesTable . ' as s', 's.id = p.suite_number', 'left');
+     $this->tenantDb->where('p.status', 1);
+     $this->tenantDb->where('(p.date_of_discharge IS NULL OR p.date_of_discharge >= CURDATE())');
+     $this->tenantDb->order_by('s.bed_no', 'ASC');
+     return $this->tenantDb->get()->result_array();
 }
 
 public function fetchMenuDetails($fetchAllColumns = '', $isDashboard = false) {
