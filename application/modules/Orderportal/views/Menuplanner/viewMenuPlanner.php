@@ -296,6 +296,8 @@ function getAllergenNames($allergenValues, $allergies) {
                                                                     $groupedOptions[$optName]['menu_option_description'] = $mo['menu_option_description'];
                                                                 }
                                                             }
+                                                            // Sort options alphabetically (A-Z) by name, case-insensitively
+                                                            uksort($groupedOptions, 'strcasecmp');
                                                             ?>
                                                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                                                 <?php foreach ($groupedOptions as $optName => $group) {
