@@ -215,7 +215,7 @@ input:checked + .switch-slider:before {
     padding: 1rem 0.75rem;
     text-align: center;
     vertical-align: middle;
-    font-size: 0.875rem;
+    font-size: 1.05rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -225,7 +225,7 @@ input:checked + .switch-slider:before {
     vertical-align: middle;
     border-color: #e5e7eb;
     text-align: center;
-    font-size: 0.875rem;
+    font-size: 1.05rem;
     color: #374151;
 }
 
@@ -269,9 +269,22 @@ input:checked + .switch-slider:before {
 }
 
 .form-check-label {
-    font-size: 0.875rem;
+    font-size: 1.05rem;
     color: #374151;
     cursor: pointer;
+}
+
+/* Enlarge food option list and patient detail text for better chef readability */
+.table td small.text-secondary {
+    font-size: 0.95rem;
+}
+
+.form-check.fs-12 {
+    font-size: 1.05rem !important;
+}
+
+.table td .badge.rounded-pill {
+    font-size: 0.8rem !important;
 }
 
 /* Success button styling */
@@ -523,7 +536,7 @@ input:checked + .switch-slider:before {
                                     </span>
                                 <?php endif; ?>
                                 <?php if (!empty($bedList['patient_name'])): ?>
-                                    <br><span style="color: #2563eb; font-weight: bold; font-size: 0.85rem;">👤 Name:</span> <span style="color: #374151; font-size: 0.85rem;"><?php echo htmlspecialchars($bedList['patient_name']); ?></span>
+                                    <br><span style="color: #2563eb; font-weight: bold; font-size: 1rem;">👤 Name:</span> <span style="color: #374151; font-size: 1rem;"><?php echo htmlspecialchars($bedList['patient_name']); ?></span>
                                 <?php endif; ?>
                                 <?php 
                                 // Display Patient Allergies (convert IDs to names)
@@ -540,7 +553,7 @@ input:checked + .switch-slider:before {
                                             }
                                         }
                                         if (!empty($allergenNamesForDisplay)) {
-                                            echo '<br><span style="color: #dc2626; font-weight: bold; font-size: 0.85rem;">⚠️ Allergies:</span> <span style="color: #374151; font-size: 0.85rem;">' . htmlspecialchars(implode(', ', $allergenNamesForDisplay)) . '</span>';
+                                            echo '<br><span style="color: #dc2626; font-weight: bold; font-size: 1rem;">⚠️ Allergies:</span> <span style="color: #374151; font-size: 1rem;">' . htmlspecialchars(implode(', ', $allergenNamesForDisplay)) . '</span>';
                                         }
                                     }
                                 }
@@ -559,14 +572,14 @@ input:checked + .switch-slider:before {
                                             }
                                         }
                                         if (!empty($dietaryNamesForDisplay)) {
-                                            echo '<br><span style="color: #16a34a; font-weight: bold; font-size: 0.85rem;">🍽️ Dietary:</span> <span style="color: #374151; font-size: 0.85rem;">' . htmlspecialchars(implode(', ', $dietaryNamesForDisplay)) . '</span>';
+                                            echo '<br><span style="color: #16a34a; font-weight: bold; font-size: 1rem;">🍽️ Dietary:</span> <span style="color: #374151; font-size: 1rem;">' . htmlspecialchars(implode(', ', $dietaryNamesForDisplay)) . '</span>';
                                         }
                                     }
                                 }
                                 
                                 // Display Patient Special Instructions
                                 if (!empty($bedList['patient_instructions']) && trim($bedList['patient_instructions']) !== '') {
-                                    echo '<br><span style="color: #7c3aed; font-weight: bold; font-size: 0.85rem;">📋 Special Instructions:</span> <span style="color: #374151; font-size: 0.85rem;">' . htmlspecialchars($bedList['patient_instructions']) . '</span>';
+                                    echo '<br><span style="color: #7c3aed; font-weight: bold; font-size: 1rem;">📋 Special Instructions:</span> <span style="color: #374151; font-size: 1rem;">' . htmlspecialchars($bedList['patient_instructions']) . '</span>';
                                 }
                                 ?>
                                 <?php echo !empty($bedList['ward_no']) ? '<br>Ward No: ' . $bedList['ward_no'] : ''; ?>

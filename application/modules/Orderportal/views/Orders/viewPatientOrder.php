@@ -437,8 +437,21 @@
                                                     ?>
                                                     
                                                 </div>
-                                    <?php 
-                                    // Check for item-specific comments
+                                                <?php
+                                                // Suite numbers that ordered this item (e.g. 302, 304, 307)
+                                                $suiteNumbers = isset($item['suite_numbers']) ? trim((string)$item['suite_numbers']) : '';
+                                                if ($suiteNumbers !== ''):
+                                                    $suiteList = array_filter(array_map('trim', explode(',', $suiteNumbers)), function($s) { return $s !== ''; });
+                                                    if (!empty($suiteList)):
+                                                ?>
+                                                <div class="flex items-start gap-1 mb-1 ml-5 suite-numbers-list">
+                                                    <span class="text-xs font-semibold text-gray-500 mt-0.5">Suites:</span>
+                                                    <span class="text-xs font-bold text-gray-700"><?php echo htmlspecialchars(implode(', ', $suiteList)); ?></span>
+                                                </div>
+                                                <?php
+                                                    endif;
+                                                endif;
+                                                ?>
                                     $commentKey = $item['option_id']; // Using option_id as key
                                     $hasComments = false;
                                     $itemSpecificComments = [];

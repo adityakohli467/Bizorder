@@ -2492,6 +2492,7 @@ class Order extends MY_Controller
                 'all_qty'          => (int)$row['all_qty'], // Total quantity
                 'bed_count'        => (int)$row['bed_count'],
                 'bed_details'      => $row['bed_quantities'],
+                'suite_numbers'    => $row['suite_numbers'] ?? '',
                 'is_completed'     => (int)$row['is_completed']
             ];
              

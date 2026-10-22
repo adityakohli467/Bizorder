@@ -109,6 +109,7 @@ function fetchOrderForChef($date = null, $orderId = null, $departmentId = null) 
         SUM(opo.quantity) as all_qty,
         COUNT(DISTINCT opo.bed_id) as bed_count,
         GROUP_CONCAT(DISTINCT CONCAT(opo.bed_id, ":", opo.quantity, ":", opo.status) SEPARATOR "|") as bed_quantities,
+        GROUP_CONCAT(DISTINCT suite_prod.bed_no ORDER BY suite_prod.bed_no SEPARATOR ",") as suite_numbers,
         MAX(opo.status) as is_completed
     ');
     
@@ -116,6 +117,8 @@ function fetchOrderForChef($date = null, $orderId = null, $departmentId = null) 
     $this->tenantDb->join('orders_to_patient_options as opo', 'o.order_id = opo.order_id', 'INNER');
     $this->tenantDb->join('menuDetails as md', 'md.id = opo.menu_id', 'INNER');
     $this->tenantDb->join('menu_options as mo', 'mo.id = opo.option_id', 'INNER');
+    // Always join suites to collect the suite numbers (bed_no) that ordered each item
+    $this->tenantDb->join('suites as suite_prod', 'suite_prod.id = opo.bed_id', 'LEFT');
     
     // Join to get category name from opo.category_id (the actual meal period ordered)
     // LEFT JOIN to handle edge cases where category_id might be NULL after migration
