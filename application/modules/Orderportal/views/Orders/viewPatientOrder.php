@@ -452,6 +452,8 @@
                                                     endif;
                                                 endif;
                                                 ?>
+                                    <?php 
+                                    // Check for item-specific comments
                                     $commentKey = $item['option_id']; // Using option_id as key
                                     $hasComments = false;
                                     $itemSpecificComments = [];

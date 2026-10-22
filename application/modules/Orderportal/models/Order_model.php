@@ -109,9 +109,11 @@ function fetchOrderForChef($date = null, $orderId = null, $departmentId = null) 
         SUM(opo.quantity) as all_qty,
         COUNT(DISTINCT opo.bed_id) as bed_count,
         GROUP_CONCAT(DISTINCT CONCAT(opo.bed_id, ":", opo.quantity, ":", opo.status) SEPARATOR "|") as bed_quantities,
-        GROUP_CONCAT(DISTINCT suite_prod.bed_no ORDER BY suite_prod.bed_no SEPARATOR ",") as suite_numbers,
         MAX(opo.status) as is_completed
     ');
+    // Suite numbers (bed_no) that ordered each item - separate select with escaping disabled
+    // so the GROUP_CONCAT/ORDER BY expression is passed through untouched
+    $this->tenantDb->select('GROUP_CONCAT(DISTINCT suite_prod.bed_no ORDER BY suite_prod.bed_no) as suite_numbers', FALSE);
     
     $this->tenantDb->from('orders as o');
     $this->tenantDb->join('orders_to_patient_options as opo', 'o.order_id = opo.order_id', 'INNER');
