@@ -725,7 +725,7 @@ button .svg-inline--fa path {
                                                             </button>
                                                         </a>
                                                         <button class="transfer-suite-btn w-full bg-red-500 text-white py-3 px-4 rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center" data-suite-id="<?php echo $bedList['suite_id']; ?>" data-suite-number="<?php echo htmlspecialchars($bedList['bed_no']); ?>" title="Transfer Client">
-                                                            <i class="fa-solid fa-exchange-alt mr-2"></i>Transfer
+                                                            <i class="fa-solid fa-exchange-alt mr-2"></i>Transfer Room
                                                         </button>
                                                     </div>
                                                 <?php } ?>
