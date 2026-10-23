@@ -349,6 +349,16 @@ function getAllergenNames($allergenValues, $allergies) {
                                                                                 </span>
                                                                             <?php endif; ?>
                                                                         </span>
+                                                                        <?php if ($this->session->userdata('role_id') != 3): ?>
+                                                                        <a href="<?php echo site_url('Orderportal/Configfoodmenu/menu_management?mode=edit&menu_id=' . (int)$menuId . '&option_name=' . urlencode($group['menu_option_name'])); ?>"
+                                                                           target="_blank" rel="noopener"
+                                                                           class="ml-auto"
+                                                                           style="color:#7c3aed;"
+                                                                           title="Add / edit variations"
+                                                                           onclick="event.stopPropagation();">
+                                                                            <i class="ri-settings-4-line"></i>
+                                                                        </a>
+                                                                        <?php endif; ?>
                                                                     </div>
                                                                 <?php } ?>
                                                             </div>
