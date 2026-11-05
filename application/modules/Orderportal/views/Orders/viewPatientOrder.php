@@ -201,6 +201,50 @@
                 </div>
             </div>
         </div>
+
+        <!-- Category-wise Orders Placed (patients who ordered per meal period) -->
+        <?php
+            // Color palettes cycled across the meal-period cards
+            $catPalettes = [
+                ['from' => 'from-teal-50',   'to' => 'to-teal-100',   'border' => 'border-teal-200',   'label' => 'text-teal-700',   'value' => 'text-teal-900',   'icon_bg' => 'bg-teal-500'],
+                ['from' => 'from-indigo-50', 'to' => 'to-indigo-100', 'border' => 'border-indigo-200', 'label' => 'text-indigo-700', 'value' => 'text-indigo-900', 'icon_bg' => 'bg-indigo-500'],
+                ['from' => 'from-rose-50',   'to' => 'to-rose-100',   'border' => 'border-rose-200',   'label' => 'text-rose-700',   'value' => 'text-rose-900',   'icon_bg' => 'bg-rose-500'],
+                ['from' => 'from-amber-50',  'to' => 'to-amber-100',  'border' => 'border-amber-200',  'label' => 'text-amber-700',  'value' => 'text-amber-900',  'icon_bg' => 'bg-amber-500'],
+            ];
+            // Pick a sensible icon based on the meal-period name
+            $catIcon = function($name) {
+                $n = strtolower($name);
+                if (strpos($n, 'breakfast') !== false) return 'fa-mug-hot';
+                if (strpos($n, 'lunch') !== false)     return 'fa-utensils';
+                if (strpos($n, 'dinner') !== false)    return 'fa-moon';
+                if (strpos($n, 'supper') !== false)    return 'fa-moon';
+                if (strpos($n, 'snack') !== false)     return 'fa-cookie-bite';
+                return 'fa-bowl-food';
+            };
+            $categoryOrders = isset($metrics['category_orders']) ? $metrics['category_orders'] : [];
+        ?>
+        <?php if (!empty($categories)): ?>
+        <div class="grid grid-cols-1 md:grid-cols-<?php echo min(4, max(1, count($categories))); ?> gap-4 mt-4">
+            <?php foreach ($categories as $index => $cat): ?>
+                <?php
+                    $catId = (int)$cat['id'];
+                    $catCount = isset($categoryOrders[$catId]) ? $categoryOrders[$catId]['count'] : 0;
+                    $p = $catPalettes[$index % count($catPalettes)];
+                ?>
+                <div class="bg-gradient-to-br <?php echo $p['from'] . ' ' . $p['to']; ?> rounded-xl p-4 border <?php echo $p['border']; ?>">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-semibold <?php echo $p['label']; ?> mb-1"><?php echo htmlspecialchars($cat['name']); ?> Orders</p>
+                            <p class="text-3xl font-bold <?php echo $p['value']; ?>"><?php echo $catCount; ?></p>
+                        </div>
+                        <div class="w-12 h-12 <?php echo $p['icon_bg']; ?> rounded-full flex items-center justify-center">
+                            <i class="fas <?php echo $catIcon($cat['name']); ?> text-white text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Read-Only Banner for Future Dates -->

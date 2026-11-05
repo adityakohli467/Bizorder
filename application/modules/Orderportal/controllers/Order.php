@@ -2640,12 +2640,63 @@ class Order extends MY_Controller
         // ✅ CRITICAL FIX: Ensure suitesWithoutOrders is never negative
         // Suites WITHOUT orders = Total Patients - Suites With Orders
         $suitesWithoutOrders = max(0, $totalPatients - $suitesWithOrders);
-        
+
+        // ✅ CATEGORY-WISE COUNTS: Count distinct patients/suites that placed an order
+        // for each meal period (Breakfast / Lunch / Dinner). A patient may order for only
+        // some meals, so these are counted independently per category.
+        // Uses the SAME safety filters as the "Orders Placed" count above to stay consistent.
+        $categoryOrdersRaw = $this->tenantDb->query("
+            SELECT fmc.id as category_id, fmc.name as category_name,
+                   COALESCE(fmc.sort_order, 999) as sort_order,
+                   COUNT(DISTINCT opo.bed_id) as patient_count
+            FROM orders o
+            INNER JOIN orders_to_patient_options opo ON opo.order_id = o.order_id
+            INNER JOIN suites s ON s.id = opo.bed_id
+            INNER JOIN people p ON p.suite_number = s.id AND p.status = 1
+            INNER JOIN foodmenuconfig fmc ON fmc.id = opo.category_id AND fmc.listtype = 'category' AND fmc.is_deleted = 0
+            LEFT JOIN suite_order_details sod ON sod.id = opo.suite_order_detail_id
+            WHERE o.date = ?
+            AND o.buttonType = 'sendorder'
+            AND o.status != 0
+            AND (opo.is_cancelled = 0 OR opo.is_cancelled IS NULL)
+            AND s.is_deleted = 0
+            AND s.is_vaccant = 0
+            AND s.status = 1
+            AND (p.date_of_discharge IS NULL OR p.date_of_discharge > ?)
+            $orderDeptFilter
+            AND (
+                (o.is_floor_consolidated != 1 AND (
+                    opo.suite_order_detail_id IS NULL
+                    OR opo.suite_order_detail_id = 0
+                    OR (sod.id IS NOT NULL AND sod.status = 'active')
+                ))
+                OR
+                (o.is_floor_consolidated = 1 AND sod.id IS NOT NULL AND sod.status = 'active' AND sod.floor_order_id = o.order_id AND sod.suite_id = opo.bed_id)
+            )
+            AND (
+                opo.suite_order_detail_id IS NULL
+                OR opo.suite_order_detail_id = 0
+                OR (sod.id IS NOT NULL AND sod.floor_order_id = o.order_id AND sod.suite_id = opo.bed_id)
+            )
+            GROUP BY fmc.id, fmc.name, fmc.sort_order
+            ORDER BY sort_order ASC
+        ", array_merge([$date, $date], $orderDeptParams))->result_array();
+
+        // Key the counts by category_id for easy lookup in the view
+        $categoryOrders = [];
+        foreach ($categoryOrdersRaw as $catRow) {
+            $categoryOrders[(int)$catRow['category_id']] = [
+                'name'  => $catRow['category_name'],
+                'count' => (int)$catRow['patient_count']
+            ];
+        }
+
         return [
             'total_patients' => $totalPatients,
             'suites_with_orders' => $suitesWithOrders,
             'suites_without_orders' => $suitesWithoutOrders,
-            'occupied_suites' => $occupiedSuites
+            'occupied_suites' => $occupiedSuites,
+            'category_orders' => $categoryOrders
         ];
     }
 
