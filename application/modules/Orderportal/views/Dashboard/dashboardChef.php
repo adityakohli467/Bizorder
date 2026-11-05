@@ -955,7 +955,7 @@ function showFilterFeedback(day, meal) {
                                 </a>
                                 <a class="people-list-btn text-decoration-none mt-3" href="<?php echo base_url('Orderportal/Hospitalconfig/peopleList')  ?>">
                                     <i class="fa-solid fa-users mr-2"></i>
-                                    On-board Patients
+                                    View Patient List
                                 </a>
                             </div>
                         </div>
